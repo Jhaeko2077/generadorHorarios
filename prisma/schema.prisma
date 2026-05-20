@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MeetingWeekStatus {
+  draft
+  completed
+  exported
+}
+
+enum MeetingSection {
+  TESOROS
+  MAESTROS
+  VIDA_CRISTIANA
+  OTROS
+}
+
+enum AssignmentMode {
+  single
+  two_rooms_single_person
+  two_rooms_pair
+  conductor_reader
+  none
+}
+
+enum AssignmentRoom {
+  SALA_1
+  SALA_2
+  SALA_B
+  GENERAL
+}
+
+model Congregation {
+  id          String        @id @default(cuid())
+  name        String
+  code        String        @unique
+  meetingWeeks MeetingWeek[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Group {
+  id           String   @id @default(cuid())
+  name         String
+  prefixNumber Int      @unique
+  description  String?
+  active       Boolean  @default(true)
+  members      Member[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Category {
+  id           String           @id @default(cuid())
+  name         String           @unique
+  description  String?
+  active       Boolean          @default(true)
+  members      MemberCategory[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model Member {
+  id           String           @id @default(cuid())
+  fullName     String
+  code         String           @unique
+  groupId      String
+  group        Group            @relation(fields: [groupId], references: [id])
+  active       Boolean          @default(true)
+  notes        String?
+  categories   MemberCategory[]
+  assignments  Assignment[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model MemberCategory {
+  id         String   @id @default(cuid())
+  memberId   String
+  categoryId String
+  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([memberId, categoryId])
+}
+
+model MeetingWeek {
+  id              String           @id @default(cuid())
+  congregationId  String
+  congregation    Congregation     @relation(fields: [congregationId], references: [id])
+  weekStart       DateTime
+  weekEnd         DateTime
+  meetingDate     DateTime
+  sourceUrl       String?
+  bibleReading    String?
+  openingSong     String?
+  middleSong      String?
+  closingSong     String?
+  status          MeetingWeekStatus @default(draft)
+  notes           String?
+  parts           MeetingPart[]
+  assignments     Assignment[]
+  exportLogs      ExportLog[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model MeetingPart {
+  id               String         @id @default(cuid())
+  meetingWeekId    String
+  meetingWeek      MeetingWeek    @relation(fields: [meetingWeekId], references: [id], onDelete: Cascade)
+  section          MeetingSection
+  partNumber       Int?
+  title            String
+  durationMinutes  Int?
+  reference        String?
+  orderIndex       Int
+  requiresTwoRooms Boolean        @default(false)
+  assignmentMode   AssignmentMode @default(single)
+  notes            String?
+  assignments      Assignment[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model Assignment {
+  id                 String          @id @default(cuid())
+  meetingWeekId      String
+  meetingWeek        MeetingWeek     @relation(fields: [meetingWeekId], references: [id], onDelete: Cascade)
+  meetingPartId      String?
+  meetingPart        MeetingPart?    @relation(fields: [meetingPartId], references: [id], onDelete: SetNull)
+  role               String
+  room               AssignmentRoom?
+  memberId           String
+  member             Member          @relation(fields: [memberId], references: [id])
+  memberCodeSnapshot String
+  memberNameSnapshot String
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+model ExportLog {
+  id            String      @id @default(cuid())
+  meetingWeekId String
+  meetingWeek   MeetingWeek @relation(fields: [meetingWeekId], references: [id], onDelete: Cascade)
+  fileName      String
+  createdAt     DateTime    @default(now())
+}
