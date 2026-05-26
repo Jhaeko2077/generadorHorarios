@@ -1,0 +1,2384 @@
+You are Codex, acting as a senior full-stack engineer, backend architect, database designer, and operations-research developer.
+
+Build a complete production-grade MVP for an academic schedule generator for a technical institute. The project must use Google OR-Tools CP-SAT as the mathematical optimization engine, PostgreSQL as the local database, FastAPI as the backend, and a modern TypeScript frontend.
+
+This is a full project request. Implement the application end to end. Do not stop at pseudocode. Create real files, real migrations, real models, real APIs, real frontend pages, seed data, tests, documentation, and a runnable local setup.
+
+============================================================
+PROJECT NAME
+============================================================
+
+Academic Timetable Optimizer
+
+Alternative internal codename:
+SmartSchedule Institute
+
+============================================================
+PROJECT PURPOSE
+============================================================
+
+Create a web system that helps an institute generate academic schedules automatically.
+
+The system must allow:
+
+1. Teachers to register.
+2. Teachers to define their working days, available time ranges, unavailable time ranges, preferred time ranges, maximum weekly hours, maximum daily hours, and maximum consecutive teaching blocks.
+3. Administrators to manage programs, cycles, sections, courses, classrooms, labs, workshops, time slots, academic terms, and course offerings.
+4. Administrators to generate optimized schedules using OR-Tools CP-SAT.
+5. The scheduler to respect hard constraints and optimize soft constraints.
+6. The system to recommend good time slots and rooms.
+7. The generated schedules to vary between academic terms in a controlled and measurable way.
+8. The administrator to view schedules by section, teacher, and room.
+9. The system to detect conflicts, explain infeasibility, store schedule runs, export to Excel/PDF, and keep audit logs.
+
+This project must look serious enough for an innovation contest. It should not feel like a toy CRUD app. The schedule generation must be mathematically grounded.
+
+============================================================
+HIGH-LEVEL PRODUCT DESCRIPTION
+============================================================
+
+The system has three user types:
+
+1. Admin
+   - Manages academic data.
+   - Creates academic terms.
+   - Creates courses, cycles, sections, rooms, and time slots.
+   - Assigns teachers to course offerings.
+   - Runs the OR-Tools schedule generator.
+   - Reviews generated schedules, metrics, conflicts, and recommendations.
+   - Exports schedules.
+
+2. Teacher
+   - Registers an account.
+   - Completes profile.
+   - Selects employment type.
+   - Defines availability.
+   - Defines preferred and discouraged time blocks.
+   - Views assigned schedule.
+
+3. Viewer/Read-only role
+   - Optional.
+   - Can view published schedules only.
+
+For the MVP, implement Admin and Teacher. Viewer is optional but the schema can support it.
+
+============================================================
+TECH STACK
+============================================================
+
+Backend:
+- Python 3.11+
+- FastAPI
+- SQLAlchemy 2.x
+- Alembic
+- PostgreSQL
+- Pydantic
+- Google OR-Tools CP-SAT
+- PyJWT or python-jose for JWT auth
+- passlib or bcrypt for password hashing
+- pytest
+- pytest-cov
+- ruff or black for formatting/linting
+- openpyxl or pandas for Excel export
+- reportlab or WeasyPrint for PDF export
+
+Frontend:
+- React + TypeScript, preferably Vite.
+- React Router.
+- TanStack Query or a simple API service layer.
+- Simple clean CSS or Tailwind if already configured.
+- No need for complex UI libraries unless the repository already uses one.
+
+Database:
+- PostgreSQL only.
+- Do not use SQLite.
+- Provide docker-compose.yml for local PostgreSQL.
+- Use Alembic migrations.
+- Provide seed data.
+
+Local tooling:
+- .env.example
+- Makefile or scripts for common commands.
+- README.md with full instructions.
+- Optional: Dockerfile for backend and frontend.
+- Mandatory: docker-compose.yml for PostgreSQL.
+
+============================================================
+REPOSITORY BEHAVIOR
+============================================================
+
+First inspect the current repository.
+
+If the repository is empty:
+- Create a clean monorepo:
+  /backend
+  /frontend
+  docker-compose.yml
+  README.md
+  AGENTS.md
+  .gitignore
+  .env.example
+
+If the repository already has files:
+- Preserve existing structure when reasonable.
+- Do not delete unrelated files.
+- Add missing modules in a clean way.
+- Do not rewrite everything blindly.
+
+Create an AGENTS.md file at repository root explaining:
+- Project purpose.
+- Stack.
+- How to run tests.
+- Coding standards.
+- Scheduling engine conventions.
+- Database migration rules.
+- Frontend conventions.
+- Safety rules: never store plaintext passwords, never bypass hard constraints.
+
+============================================================
+NON-NEGOTIABLE REQUIREMENTS
+============================================================
+
+1. The scheduler must use OR-Tools CP-SAT.
+2. PostgreSQL must be used as the database.
+3. Teachers must be able to register and define availability.
+4. Admin must be able to generate schedules from stored data.
+5. Generated schedules must respect hard constraints.
+6. Soft constraints must be optimized with weighted penalties.
+7. The system must support controlled variation between terms.
+8. The system must store each schedule run.
+9. The system must show infeasibility diagnostics.
+10. The project must run locally.
+11. Add seed data sufficient to demo a complete schedule generation.
+12. Add tests for core scheduling constraints.
+13. Document everything in README.md.
+
+============================================================
+SYSTEM ARCHITECTURE
+============================================================
+
+Use this architecture:
+
+Frontend:
+React TypeScript app
+- Login/register pages
+- Teacher profile pages
+- Teacher availability editor
+- Admin dashboard
+- Academic data CRUD pages
+- Schedule generation page
+- Schedule viewer pages
+- Conflicts/diagnostics page
+- Recommendation page
+- Export buttons
+
+Backend:
+FastAPI app
+- Auth routes
+- User routes
+- Teacher routes
+- Academic data routes
+- Scheduling routes
+- Export routes
+
+Database:
+PostgreSQL
+- Users
+- Teachers
+- Availability
+- Academic terms
+- Programs
+- Cycles
+- Sections
+- Courses
+- Rooms
+- Time slots
+- Course offerings
+- Schedule runs
+- Schedule assignments
+- Schedule conflicts
+- Recommendations
+- Manual locks
+- Audit logs
+
+Optimization engine:
+OR-Tools CP-SAT
+- Data loader
+- Domain preprocessing
+- Decision variables
+- Hard constraints
+- Soft penalties
+- Solver parameters
+- Candidate generation
+- Scoring
+- Diagnostics
+- Persistence
+
+============================================================
+RECOMMENDED BACKEND STRUCTURE
+============================================================
+
+Create:
+
+backend/
+  app/
+    __init__.py
+    main.py
+
+    core/
+      __init__.py
+      config.py
+      security.py
+      enums.py
+      exceptions.py
+
+    db/
+      __init__.py
+      base.py
+      session.py
+      init_db.py
+      seed.py
+
+    models/
+      __init__.py
+      user.py
+      teacher.py
+      academic.py
+      room.py
+      schedule.py
+      audit.py
+
+    schemas/
+      __init__.py
+      auth.py
+      user.py
+      teacher.py
+      academic.py
+      room.py
+      schedule.py
+      export.py
+
+    api/
+      __init__.py
+      deps.py
+      router.py
+      routes/
+        __init__.py
+        auth.py
+        users.py
+        teachers.py
+        academic_terms.py
+        programs.py
+        cycles.py
+        sections.py
+        courses.py
+        rooms.py
+        time_slots.py
+        course_offerings.py
+        schedule_runs.py
+        exports.py
+        audit.py
+
+    services/
+      __init__.py
+      auth_service.py
+      audit_service.py
+      export_service.py
+      scheduler/
+        __init__.py
+        data_loader.py
+        domain.py
+        models.py
+        constraints.py
+        solver.py
+        scorer.py
+        diagnostics.py
+        recommendations.py
+        persistence.py
+        utils.py
+
+    tests/
+      __init__.py
+      conftest.py
+      test_auth.py
+      test_teacher_availability.py
+      test_scheduler_feasible.py
+      test_scheduler_constraints.py
+      test_scheduler_infeasible.py
+      test_recommendations.py
+
+  alembic/
+  alembic.ini
+  requirements.txt
+  pyproject.toml
+  .env.example
+
+============================================================
+RECOMMENDED FRONTEND STRUCTURE
+============================================================
+
+frontend/
+  src/
+    main.tsx
+    App.tsx
+
+    api/
+      client.ts
+      auth.ts
+      teachers.ts
+      academic.ts
+      schedules.ts
+      exports.ts
+
+    components/
+      Layout.tsx
+      Navbar.tsx
+      Sidebar.tsx
+      ProtectedRoute.tsx
+      StatusBadge.tsx
+      ScheduleGrid.tsx
+      FormField.tsx
+      DataTable.tsx
+      Loading.tsx
+      ErrorMessage.tsx
+
+    pages/
+      LoginPage.tsx
+      RegisterTeacherPage.tsx
+      DashboardPage.tsx
+      TeacherProfilePage.tsx
+      TeacherAvailabilityPage.tsx
+      AcademicTermsPage.tsx
+      ProgramsPage.tsx
+      CyclesPage.tsx
+      SectionsPage.tsx
+      CoursesPage.tsx
+      RoomsPage.tsx
+      TimeSlotsPage.tsx
+      CourseOfferingsPage.tsx
+      GenerateSchedulePage.tsx
+      ScheduleRunDetailPage.tsx
+      ScheduleBySectionPage.tsx
+      ScheduleByTeacherPage.tsx
+      ScheduleByRoomPage.tsx
+      ConflictsPage.tsx
+      RecommendationsPage.tsx
+
+    types/
+      auth.ts
+      teacher.ts
+      academic.ts
+      schedule.ts
+
+    utils/
+      dates.ts
+      schedule.ts
+      constants.ts
+
+  package.json
+  vite.config.ts
+  tsconfig.json
+  .env.example
+
+============================================================
+DATABASE MODEL
+============================================================
+
+Use SQLAlchemy models and Alembic migrations.
+
+Use UUID primary keys where practical, or integer IDs if simpler. Be consistent.
+
+Use created_at and updated_at timestamps where appropriate.
+
+Use enums where helpful.
+
+------------------------------------------------------------
+1. users
+------------------------------------------------------------
+
+Fields:
+- id
+- full_name
+- email, unique, indexed
+- password_hash
+- role enum: admin, teacher
+- is_active boolean
+- created_at
+- updated_at
+
+Rules:
+- Email must be unique.
+- Password must be hashed.
+- Never store plaintext password.
+
+------------------------------------------------------------
+2. teacher_profiles
+------------------------------------------------------------
+
+Fields:
+- id
+- user_id FK users.id unique
+- teacher_code unique nullable
+- employment_type enum:
+  - part_time
+  - full_time
+  - extended_availability
+- academic_role enum:
+  - theory_teacher
+  - lab_teacher
+  - workshop_teacher
+  - coordinator
+  - mixed
+- max_weekly_hours integer
+- min_weekly_hours integer default 0
+- max_daily_hours integer
+- max_consecutive_blocks integer
+- preferred_shift enum:
+  - morning
+  - afternoon
+  - evening
+  - any
+- can_teach_theory boolean
+- can_teach_labs boolean
+- can_teach_workshops boolean
+- can_teach_online boolean default false
+- is_available_for_substitution boolean default false
+- notes text nullable
+- created_at
+- updated_at
+
+Business defaults:
+- part_time: max_weekly_hours maybe 8-12, max_daily_hours 4, max_consecutive_blocks 2
+- full_time: max_weekly_hours maybe 18-24, max_daily_hours 6, max_consecutive_blocks 3
+- extended_availability: higher limits, but still require max_daily_hours and max_consecutive_blocks to avoid abusive schedules
+
+Do not hardcode these defaults only in the solver. Store them in DB and seed reasonable values.
+
+------------------------------------------------------------
+3. teacher_availability
+------------------------------------------------------------
+
+Fields:
+- id
+- teacher_id FK teacher_profiles.id
+- day_of_week enum:
+  - monday
+  - tuesday
+  - wednesday
+  - thursday
+  - friday
+  - saturday
+  - sunday
+- start_time
+- end_time
+- availability_type enum:
+  - available
+  - preferred
+  - discouraged
+  - unavailable
+- max_hours_in_range integer nullable
+- reason text nullable
+- created_at
+- updated_at
+
+Rules:
+- start_time < end_time.
+- A teacher may have multiple ranges per day.
+- unavailable overrides available.
+- preferred is available with reward or lower penalty.
+- discouraged is allowed but penalized.
+- If no availability exists for a teacher, treat as unavailable by default unless a system setting says otherwise. For MVP, treat as unavailable by default.
+
+------------------------------------------------------------
+4. academic_terms
+------------------------------------------------------------
+
+Fields:
+- id
+- name
+- code unique
+- start_date
+- end_date
+- is_active boolean
+- previous_term_id nullable FK academic_terms.id
+- created_at
+- updated_at
+
+Rules:
+- Used to compare diversity against previous term.
+
+------------------------------------------------------------
+5. programs
+------------------------------------------------------------
+
+Fields:
+- id
+- code unique
+- name
+- description nullable
+- is_active boolean
+
+------------------------------------------------------------
+6. cycles
+------------------------------------------------------------
+
+Fields:
+- id
+- program_id FK programs.id
+- name
+- number integer
+- description nullable
+
+Example:
+- Cycle 1
+- Cycle 2
+- Cycle 3
+
+------------------------------------------------------------
+7. sections
+------------------------------------------------------------
+
+Fields:
+- id
+- academic_term_id FK academic_terms.id
+- cycle_id FK cycles.id
+- code
+- name
+- student_count integer
+- shift enum:
+  - morning
+  - afternoon
+  - evening
+  - mixed
+- is_active boolean
+
+Rules:
+- A section belongs to a cycle and academic term.
+- Section cannot attend two classes at the same time.
+
+------------------------------------------------------------
+8. courses
+------------------------------------------------------------
+
+Fields:
+- id
+- cycle_id FK cycles.id
+- code unique or unique per program
+- name
+- weekly_hours integer
+- session_duration_blocks integer
+- sessions_per_week integer nullable
+- requires_lab boolean
+- room_type_required enum:
+  - classroom
+  - lab
+  - workshop
+  - computer_lab
+  - any
+- requires_consecutive_blocks boolean default true
+- priority integer default 1
+- is_active boolean
+
+Rules:
+- weekly_hours must be positive.
+- session_duration_blocks must be positive.
+- If sessions_per_week is null, derive it from weekly_hours / session_duration_blocks.
+- For MVP, assume weekly_hours is divisible by session_duration_blocks. If not, generate mixed session lengths or return validation error. Prefer validation error for MVP.
+
+------------------------------------------------------------
+9. rooms
+------------------------------------------------------------
+
+Fields:
+- id
+- code unique
+- name
+- room_type enum:
+  - classroom
+  - lab
+  - workshop
+  - computer_lab
+- capacity integer
+- campus string nullable
+- building string nullable
+- floor string nullable
+- is_active boolean
+- notes text nullable
+
+Rules:
+- Lab courses require compatible room types.
+- Capacity must be >= section student count.
+
+------------------------------------------------------------
+10. room_unavailability
+------------------------------------------------------------
+
+Fields:
+- id
+- room_id FK rooms.id
+- day_of_week
+- start_time
+- end_time
+- reason
+- created_at
+- updated_at
+
+Use this to block maintenance periods, events, or unavailable labs.
+
+------------------------------------------------------------
+11. time_slots
+------------------------------------------------------------
+
+Fields:
+- id
+- day_of_week
+- block_index integer
+- start_time
+- end_time
+- shift enum:
+  - morning
+  - afternoon
+  - evening
+- is_active boolean
+
+Rules:
+- Timeslots are atomic blocks, for example 1 hour each.
+- Sessions with duration_blocks > 1 must occupy consecutive time slots on the same day.
+- Generate seed slots from Monday to Saturday.
+
+Recommended seed:
+- Morning blocks: 07:00-08:00, 08:00-09:00, 09:00-10:00, 10:00-11:00, 11:00-12:00
+- Afternoon blocks: 13:00-14:00, 14:00-15:00, 15:00-16:00, 16:00-17:00
+- Evening blocks: 18:00-19:00, 19:00-20:00, 20:00-21:00, 21:00-22:00
+
+Use whatever is easiest, but keep consistent atomic block durations.
+
+------------------------------------------------------------
+12. course_offerings
+------------------------------------------------------------
+
+This is the main entity scheduled by the solver.
+
+Fields:
+- id
+- academic_term_id FK academic_terms.id
+- course_id FK courses.id
+- section_id FK sections.id
+- teacher_id FK teacher_profiles.id
+- weekly_hours integer
+- session_duration_blocks integer
+- sessions_per_week integer
+- requires_lab boolean
+- room_type_required enum
+- priority integer default 1
+- notes text nullable
+- is_active boolean
+
+Rules:
+- One offering links course + section + teacher + term.
+- The solver expands an offering into required sessions.
+
+Example:
+- Course: Applied Math
+- Section: Mechanics C1-A
+- Teacher: Ana Rojas
+- weekly_hours: 4
+- session_duration_blocks: 2
+- sessions_per_week: 2
+=> Generate 2 sessions.
+
+------------------------------------------------------------
+13. schedule_runs
+------------------------------------------------------------
+
+Fields:
+- id
+- academic_term_id FK academic_terms.id
+- name
+- status enum:
+  - pending
+  - running
+  - optimal
+  - feasible
+  - infeasible
+  - failed
+- solver_name string, default "OR-Tools CP-SAT"
+- random_seed integer
+- max_seconds integer
+- objective_value integer nullable
+- hard_conflicts_count integer default 0
+- soft_penalty_score integer default 0
+- diversity_score float nullable
+- candidates_generated integer default 1
+- selected_candidate_index integer nullable
+- weights_json JSONB
+- metadata_json JSONB
+- created_by_user_id FK users.id
+- created_at
+- finished_at nullable
+
+Rules:
+- Every generation attempt creates a schedule run.
+- Store parameters used by the solver.
+- Store status and metrics.
+
+------------------------------------------------------------
+14. schedule_assignments
+------------------------------------------------------------
+
+Fields:
+- id
+- schedule_run_id FK schedule_runs.id
+- course_offering_id FK course_offerings.id
+- teacher_id FK teacher_profiles.id
+- section_id FK sections.id
+- room_id FK rooms.id
+- start_time_slot_id FK time_slots.id
+- day_of_week
+- start_time
+- end_time
+- duration_blocks integer
+- is_locked boolean default false
+- penalty_score integer default 0
+- explanation text nullable
+- created_at
+
+Rules:
+- One assignment represents one scheduled session.
+- If duration_blocks > 1, the assignment covers consecutive slots.
+
+------------------------------------------------------------
+15. schedule_assignment_slots
+------------------------------------------------------------
+
+Fields:
+- id
+- schedule_assignment_id FK schedule_assignments.id
+- time_slot_id FK time_slots.id
+
+Purpose:
+- Makes it easier to query exact slot coverage for multi-block sessions.
+
+------------------------------------------------------------
+16. schedule_conflicts
+------------------------------------------------------------
+
+Fields:
+- id
+- schedule_run_id FK schedule_runs.id
+- conflict_type string
+- severity enum:
+  - hard
+  - soft
+  - warning
+- message text
+- entity_json JSONB
+- created_at
+
+Examples:
+- teacher_unavailable
+- teacher_double_booked
+- room_double_booked
+- section_double_booked
+- insufficient_lab_rooms
+- max_weekly_hours_exceeded
+- incompatible_room_type
+- manual_lock_conflict
+- no_feasible_slot_for_offering
+
+------------------------------------------------------------
+17. manual_locks
+------------------------------------------------------------
+
+Fields:
+- id
+- academic_term_id FK academic_terms.id
+- course_offering_id FK course_offerings.id
+- room_id FK rooms.id
+- start_time_slot_id FK time_slots.id
+- duration_blocks integer
+- reason text
+- created_by_user_id FK users.id
+- created_at
+
+Rules:
+- Manual locks are hard constraints.
+- If manual locks conflict, diagnostics must report it.
+
+------------------------------------------------------------
+18. audit_logs
+------------------------------------------------------------
+
+Fields:
+- id
+- user_id FK users.id nullable
+- action string
+- entity_type string
+- entity_id string nullable
+- before_json JSONB nullable
+- after_json JSONB nullable
+- created_at
+
+Use audit logs for:
+- creating/updating/deleting academic data
+- teacher availability changes
+- schedule generation
+- manual locks
+- schedule publication
+
+------------------------------------------------------------
+19. published_schedules
+------------------------------------------------------------
+
+Fields:
+- id
+- academic_term_id FK academic_terms.id
+- schedule_run_id FK schedule_runs.id
+- published_by_user_id FK users.id
+- published_at
+- is_active boolean
+
+Purpose:
+- Admin can publish one selected schedule run.
+
+============================================================
+ENUMS
+============================================================
+
+Create enums for:
+- UserRole: admin, teacher
+- EmploymentType: part_time, full_time, extended_availability
+- AcademicRole: theory_teacher, lab_teacher, workshop_teacher, coordinator, mixed
+- AvailabilityType: available, preferred, discouraged, unavailable
+- DayOfWeek: monday, tuesday, wednesday, thursday, friday, saturday, sunday
+- Shift: morning, afternoon, evening, mixed, any
+- RoomType: classroom, lab, workshop, computer_lab, any
+- ScheduleRunStatus: pending, running, optimal, feasible, infeasible, failed
+- ConflictSeverity: hard, soft, warning
+
+============================================================
+AUTHENTICATION AND AUTHORIZATION
+============================================================
+
+Implement simple JWT auth.
+
+Endpoints:
+- POST /auth/register-teacher
+- POST /auth/login
+- GET /auth/me
+- POST /auth/create-admin only if no admin exists or protected by admin role
+
+Teacher registration:
+Payload:
+- full_name
+- email
+- password
+- employment_type
+- academic_role
+- max_weekly_hours
+- max_daily_hours
+- max_consecutive_blocks
+- preferred_shift
+- can_teach_theory
+- can_teach_labs
+- can_teach_workshops
+
+Admin:
+- Can manage all data.
+- Can generate schedules.
+- Can view all teacher availability.
+- Can create course offerings.
+
+Teacher:
+- Can edit own profile.
+- Can edit own availability.
+- Can view own assigned schedule.
+- Cannot create academic terms, courses, rooms, or schedule runs.
+
+Use dependency helpers:
+- get_current_user
+- require_admin
+- require_teacher_or_admin
+
+============================================================
+API ENDPOINTS
+============================================================
+
+Implement the following routes.
+
+------------------------------------------------------------
+Auth
+------------------------------------------------------------
+
+POST /auth/register-teacher
+POST /auth/login
+GET /auth/me
+
+------------------------------------------------------------
+Teachers
+------------------------------------------------------------
+
+GET /teachers
+GET /teachers/{teacher_id}
+PUT /teachers/{teacher_id}/profile
+GET /teachers/{teacher_id}/availability
+POST /teachers/{teacher_id}/availability
+PUT /teachers/{teacher_id}/availability/{availability_id}
+DELETE /teachers/{teacher_id}/availability/{availability_id}
+
+Also:
+GET /me/teacher-profile
+PUT /me/teacher-profile
+GET /me/availability
+POST /me/availability
+
+------------------------------------------------------------
+Academic Terms
+------------------------------------------------------------
+
+GET /academic-terms
+POST /academic-terms
+GET /academic-terms/{id}
+PUT /academic-terms/{id}
+DELETE /academic-terms/{id}
+
+------------------------------------------------------------
+Programs
+------------------------------------------------------------
+
+GET /programs
+POST /programs
+GET /programs/{id}
+PUT /programs/{id}
+DELETE /programs/{id}
+
+------------------------------------------------------------
+Cycles
+------------------------------------------------------------
+
+GET /cycles
+POST /cycles
+GET /cycles/{id}
+PUT /cycles/{id}
+DELETE /cycles/{id}
+
+------------------------------------------------------------
+Sections
+------------------------------------------------------------
+
+GET /sections
+POST /sections
+GET /sections/{id}
+PUT /sections/{id}
+DELETE /sections/{id}
+
+Filters:
+- academic_term_id
+- cycle_id
+- program_id
+- shift
+
+------------------------------------------------------------
+Courses
+------------------------------------------------------------
+
+GET /courses
+POST /courses
+GET /courses/{id}
+PUT /courses/{id}
+DELETE /courses/{id}
+
+Filters:
+- cycle_id
+- requires_lab
+- room_type_required
+
+------------------------------------------------------------
+Rooms
+------------------------------------------------------------
+
+GET /rooms
+POST /rooms
+GET /rooms/{id}
+PUT /rooms/{id}
+DELETE /rooms/{id}
+
+Filters:
+- room_type
+- min_capacity
+- is_active
+
+Room unavailability:
+GET /rooms/{room_id}/unavailability
+POST /rooms/{room_id}/unavailability
+PUT /rooms/{room_id}/unavailability/{id}
+DELETE /rooms/{room_id}/unavailability/{id}
+
+------------------------------------------------------------
+Time Slots
+------------------------------------------------------------
+
+GET /time-slots
+POST /time-slots
+POST /time-slots/bulk-generate
+GET /time-slots/{id}
+PUT /time-slots/{id}
+DELETE /time-slots/{id}
+
+Bulk generate should create default slots for Monday-Saturday.
+
+------------------------------------------------------------
+Course Offerings
+------------------------------------------------------------
+
+GET /course-offerings
+POST /course-offerings
+GET /course-offerings/{id}
+PUT /course-offerings/{id}
+DELETE /course-offerings/{id}
+
+Filters:
+- academic_term_id
+- section_id
+- teacher_id
+- course_id
+
+------------------------------------------------------------
+Manual Locks
+------------------------------------------------------------
+
+GET /manual-locks
+POST /manual-locks
+DELETE /manual-locks/{id}
+
+------------------------------------------------------------
+Schedule Runs
+------------------------------------------------------------
+
+POST /schedule-runs/generate
+
+Payload:
+- academic_term_id
+- name optional
+- random_seed optional integer
+- max_seconds default 20
+- candidate_count default 1
+- weights optional object:
+  - teacher_discouraged_slot
+  - teacher_non_preferred_slot
+  - teacher_gap
+  - section_gap
+  - late_block
+  - lab_scarcity
+  - teacher_daily_concentration
+  - fairness
+  - diversity_repetition
+  - target_load_balance
+- respect_manual_locks boolean default true
+- publish_on_success boolean default false
+
+Response:
+- schedule_run_id
+- status
+- objective_value
+- hard_conflicts_count
+- soft_penalty_score
+- diversity_score
+- summary
+- diagnostics
+
+GET /schedule-runs
+GET /schedule-runs/{id}
+GET /schedule-runs/{id}/assignments
+GET /schedule-runs/{id}/assignments/by-section
+GET /schedule-runs/{id}/assignments/by-teacher
+GET /schedule-runs/{id}/assignments/by-room
+GET /schedule-runs/{id}/conflicts
+POST /schedule-runs/{id}/publish
+DELETE /schedule-runs/{id}
+
+------------------------------------------------------------
+Recommendations
+------------------------------------------------------------
+
+POST /recommendations/course-offering/{course_offering_id}
+
+Payload:
+- academic_term_id
+- schedule_run_id optional
+- limit default 5
+
+Response:
+List of:
+- time_slot_id
+- day_of_week
+- start_time
+- end_time
+- room_id
+- room_code
+- score
+- explanation
+- penalties
+
+------------------------------------------------------------
+Exports
+------------------------------------------------------------
+
+GET /exports/schedule-runs/{id}/excel
+GET /exports/schedule-runs/{id}/pdf
+GET /exports/schedule-runs/{id}/teacher/{teacher_id}/excel
+GET /exports/schedule-runs/{id}/section/{section_id}/pdf
+
+============================================================
+SCHEDULER: OR-TOOLS CP-SAT MODEL
+============================================================
+
+Use Google OR-Tools CP-SAT in Python.
+
+Main file:
+backend/app/services/scheduler/solver.py
+
+Use:
+from ortools.sat.python import cp_model
+
+Design a clean service class:
+- ScheduleSolver
+- solve(input_data: SchedulerInput) -> SchedulerResult
+
+Use Pydantic or dataclasses for internal scheduler DTOs.
+
+------------------------------------------------------------
+Scheduler Input DTOs
+------------------------------------------------------------
+
+Create internal DTOs like:
+
+TeacherDTO:
+- id
+- user_id
+- full_name
+- employment_type
+- academic_role
+- max_weekly_hours
+- min_weekly_hours
+- max_daily_hours
+- max_consecutive_blocks
+- preferred_shift
+- can_teach_theory
+- can_teach_labs
+- can_teach_workshops
+- availability_blocks
+
+CourseOfferingDTO:
+- id
+- course_id
+- course_name
+- section_id
+- section_name
+- teacher_id
+- weekly_hours
+- session_duration_blocks
+- sessions_per_week
+- requires_lab
+- room_type_required
+- priority
+
+SectionDTO:
+- id
+- name
+- student_count
+- shift
+- cycle_id
+- cycle_number
+
+RoomDTO:
+- id
+- code
+- room_type
+- capacity
+- unavailable_slot_ids
+
+TimeSlotDTO:
+- id
+- day_of_week
+- block_index
+- start_time
+- end_time
+- shift
+
+ManualLockDTO:
+- course_offering_id
+- room_id
+- start_time_slot_id
+- duration_blocks
+
+PreviousAssignmentDTO:
+- course_offering_id
+- teacher_id
+- section_id
+- room_id
+- start_time_slot_id
+- day_of_week
+- duration_blocks
+
+------------------------------------------------------------
+Session Expansion
+------------------------------------------------------------
+
+Expand each course offering into sessions.
+
+Example:
+weekly_hours = 4
+session_duration_blocks = 2
+sessions_per_week = 2
+=> create session IDs:
+- offering_id:session:1
+- offering_id:session:2
+
+If sessions_per_week is provided, use it.
+If not:
+sessions_per_week = weekly_hours // session_duration_blocks
+
+Validate:
+- weekly_hours > 0
+- session_duration_blocks > 0
+- weekly_hours divisible by session_duration_blocks for MVP
+- sessions_per_week > 0
+- teacher exists
+- section exists
+- compatible room exists
+- at least one possible time domain exists
+
+------------------------------------------------------------
+Decision Variables
+------------------------------------------------------------
+
+Create Boolean decision variables:
+
+x[(session_id, start_slot_id, room_id)] = 1
+if session is assigned to that start slot and room.
+
+Do not create impossible variables. Preprocess the domain first.
+
+Only create x variables when:
+- start slot can fit duration consecutively on the same day
+- teacher is available or discouraged/preferred/available, but not unavailable
+- section shift allows the slot
+- room is active
+- room type is compatible
+- room capacity is enough
+- room is not unavailable for any covered slot
+- manual locks do not forbid it
+
+This domain preprocessing is important for performance.
+
+Also keep coverage:
+covered_slots[(session_id, start_slot_id)] = list of time_slot_ids covered by duration_blocks.
+
+------------------------------------------------------------
+Hard Constraints
+------------------------------------------------------------
+
+Implement these as mandatory CP-SAT constraints.
+
+1. Every session exactly once
+For every session:
+sum(x[session, start_slot, room] for all feasible placements) == 1
+
+2. Teacher cannot be double-booked
+For every teacher and atomic time slot:
+sum(x[session, start_slot, room] where session teacher = teacher and placement covers slot) <= 1
+
+3. Section cannot be double-booked
+For every section and atomic time slot:
+sum(x[session, start_slot, room] where session section = section and placement covers slot) <= 1
+
+4. Room cannot be double-booked
+For every room and atomic time slot:
+sum(x[session, start_slot, room] where placement covers slot) <= 1
+
+5. Teacher availability
+Do not create variables for unavailable teacher placements.
+Discouraged is allowed but penalized.
+Preferred is allowed and rewarded or lower penalty.
+Available is neutral.
+No availability means unavailable by default.
+
+6. Room compatibility
+Do not create variables for incompatible room type.
+If course requires lab, room type must match lab/workshop/computer_lab according to requirement.
+
+7. Room capacity
+Do not create variables when room capacity < section student_count.
+
+8. Max weekly teacher hours
+For each teacher:
+sum(duration_blocks of scheduled sessions assigned to teacher) <= max_weekly_hours
+
+Since all offerings already belong to teachers, this constraint should be satisfied by data, but still enforce it.
+
+9. Min weekly teacher hours
+For each teacher:
+If min_weekly_hours > 0, try as soft target unless explicitly configured as hard.
+For MVP, treat max as hard and min as soft.
+
+10. Max daily teacher hours
+For each teacher and day:
+sum(duration_blocks scheduled for that teacher that day) <= max_daily_hours
+
+11. Max consecutive blocks
+For each teacher, day, and sliding window of size max_consecutive_blocks + 1:
+sum(teacher_busy[teacher, slot] over window) <= max_consecutive_blocks
+
+12. Manual locks
+If a manual lock exists:
+- Force the matching x variable to 1 if feasible.
+- If not feasible, return infeasible diagnostic before or after solving.
+
+13. Session consecutive blocks
+A session with duration_blocks > 1 must cover consecutive blocks on same day.
+This should be handled by feasible start slot preprocessing.
+
+14. Section shift
+For MVP:
+- morning section should only use morning slots
+- afternoon section should only use afternoon slots
+- evening section should only use evening slots
+- mixed can use any active slot
+
+15. Do not schedule inactive data
+Ignore inactive rooms, courses, sections, offerings, and time slots.
+
+------------------------------------------------------------
+Soft Constraints and Objective
+------------------------------------------------------------
+
+Build weighted penalty terms and minimize total penalty.
+
+Default weights:
+- teacher_discouraged_slot: 30
+- teacher_non_preferred_slot: 8
+- teacher_gap: 15
+- section_gap: 20
+- late_block: 5
+- lab_scarcity: 25
+- teacher_daily_concentration: 8
+- fairness: 10
+- diversity_repetition: 12
+- target_load_balance: 5
+
+Allow override from API payload.
+
+Soft penalties:
+
+1. Teacher discouraged slot penalty
+If placement uses a discouraged teacher slot:
+penalty += weight_teacher_discouraged_slot
+
+2. Teacher non-preferred slot penalty
+If teacher has preferred slots that day/week but placement uses available non-preferred:
+penalty += weight_teacher_non_preferred_slot
+
+3. Teacher gaps
+Penalize idle holes between teacher classes in the same day.
+Implement simple MVP approximation:
+- Create teacher_busy[teacher, slot].
+- For each teacher/day, if busy at earlier slot and later slot with free slots between, penalize gaps.
+Simplify if necessary, but implement a reasonable version.
+
+4. Section gaps
+Same as teacher gaps, but for section.
+This is more important than teacher gaps.
+
+5. Late block penalty
+Penalize evening or last block if avoidable, especially for morning/afternoon sections.
+
+6. Lab scarcity
+If a non-lab course uses a lab/workshop/computer_lab, penalize.
+Do not allow this if room_type_required is strict classroom. If room_type_required = any, allow but penalize.
+
+7. Teacher daily concentration
+Penalize putting too much of a teacher's weekly load on one day even if within max_daily_hours.
+
+8. Fairness by cycle/section
+Avoid always assigning bad blocks to the same cycle/section.
+Use a simple penalty:
+- Late slots, discouraged slots, and gaps contribute to section penalty.
+- Minimize max section penalty or add weighted sum plus max penalty variable if feasible.
+
+9. Diversity from previous term
+If previous assignments exist:
+- Penalize assigning same course_offering/course-section-teacher to same day/time/room as previous term.
+- Compute diversity_score after solving:
+  diversity_score = percentage of comparable assignments whose time slot or room changed.
+If no previous term exists, diversity_score = null or 1.0.
+
+10. Teacher target load balance
+If min_weekly_hours or target hours exists, penalize absolute deviation from target.
+For MVP, because offerings are preassigned to teachers, this may be limited. Still compute a metric.
+
+Objective:
+model.Minimize(sum(weighted_penalty_terms))
+
+Make objective transparent:
+- Store each assignment penalty score.
+- Store total soft penalty.
+- Include a metadata breakdown by penalty type.
+
+------------------------------------------------------------
+Controlled Variation
+------------------------------------------------------------
+
+The schedule must not always be identical.
+
+Implement:
+- random_seed parameter in schedule generation request
+- solver.parameters.random_seed = random_seed
+- solver.parameters.max_time_in_seconds = max_seconds
+- optionally solver.parameters.num_search_workers = 8 if safe
+- candidate_count support:
+  - If candidate_count > 1, run solver multiple times with different seeds:
+    seed + i
+  - Store the best candidate by objective
+  - Also consider diversity score if previous term exists
+  - Select candidate with good balance of low penalty and enough diversity
+
+Candidate scoring:
+combined_score = soft_penalty_score - diversity_bonus
+or
+combined_score = soft_penalty_score + diversity_repetition_penalty
+
+Keep simple but clear.
+
+Store:
+- candidates_generated
+- selected_candidate_index
+- random_seed
+- diversity_score
+- objective_value
+- weights_json
+- metadata_json
+
+------------------------------------------------------------
+Solver Result Status
+------------------------------------------------------------
+
+Map OR-Tools status:
+- cp_model.OPTIMAL -> optimal
+- cp_model.FEASIBLE -> feasible
+- cp_model.INFEASIBLE -> infeasible
+- cp_model.MODEL_INVALID -> failed
+- cp_model.UNKNOWN -> failed or infeasible depending on no solution found
+
+If FEASIBLE, still save assignments.
+If OPTIMAL, save assignments.
+If INFEASIBLE, save diagnostics and no assignments.
+If UNKNOWN, save diagnostics and explain timeout/no solution found.
+
+------------------------------------------------------------
+Infeasibility Diagnostics
+------------------------------------------------------------
+
+Implement diagnostics.py.
+
+Before solving, validate obvious issues:
+- no active academic term
+- no active time slots
+- no active rooms
+- no course offerings
+- teacher missing availability
+- teacher total assigned weekly hours > max_weekly_hours
+- section total weekly hours > available slots for its shift
+- no compatible room for course offering
+- no compatible room capacity for section
+- lab course without lab/workshop/computer_lab
+- manual lock references inactive slot/room/offering
+- manual lock incompatible with teacher availability
+- manual lock incompatible with room type/capacity
+- manual locks double-book teacher/section/room
+
+After INFEASIBLE:
+- Return pre-solve diagnostics if available.
+- Add general diagnostic messages:
+  - "The model is infeasible. Relax availability, add rooms, reduce assigned hours, or remove conflicting manual locks."
+- Save conflicts in schedule_conflicts.
+
+Diagnostics must be user-friendly, not only technical.
+
+============================================================
+RECOMMENDATION ENGINE
+============================================================
+
+Implement recommendations.py.
+
+Goal:
+Given a course_offering_id, return the top 5 best placements.
+
+Inputs:
+- course_offering_id
+- academic_term_id
+- optional schedule_run_id
+- limit
+
+For each feasible placement:
+- Check teacher availability.
+- Check room compatibility.
+- Check room capacity.
+- Check section shift.
+- Check conflicts against an existing schedule run if provided.
+- Score placement based on:
+  - teacher preferred slot
+  - no teacher conflict
+  - no section conflict
+  - no room conflict
+  - lower gap creation
+  - room type match
+  - capacity fit
+  - not late block
+  - not repeating previous term exactly
+
+Return:
+- time_slot_id
+- day_of_week
+- start_time
+- end_time
+- room_id
+- room_code
+- score
+- explanation
+- penalties breakdown
+
+Example explanation:
+"Recommended because the teacher marked this period as preferred, the room capacity fits the section, and it does not create a section gap."
+
+============================================================
+EXPORTS
+============================================================
+
+Implement Excel export:
+- Full schedule by section.
+- Full schedule by teacher.
+- Full schedule by room.
+- Include schedule run metrics.
+- Use openpyxl or pandas.
+
+Implement PDF export:
+- Simple PDF with schedule grid.
+- Include institute name placeholder.
+- Include academic term, generated date, status, and metrics.
+- Include section schedule tables.
+
+For MVP, PDFs can be simple but readable.
+
+============================================================
+FRONTEND REQUIREMENTS
+============================================================
+
+Create a clean frontend that can demo the full flow.
+
+------------------------------------------------------------
+Pages
+------------------------------------------------------------
+
+1. LoginPage
+- Email/password.
+- Store JWT.
+- Redirect based on role.
+
+2. RegisterTeacherPage
+- Teacher registration form.
+- Fields:
+  - full_name
+  - email
+  - password
+  - employment_type
+  - academic_role
+  - max_weekly_hours
+  - max_daily_hours
+  - max_consecutive_blocks
+  - preferred_shift
+  - can_teach_theory
+  - can_teach_labs
+  - can_teach_workshops
+
+3. TeacherProfilePage
+- View/update own profile.
+
+4. TeacherAvailabilityPage
+- Add availability blocks.
+- Table of availability.
+- Fields:
+  - day_of_week
+  - start_time
+  - end_time
+  - availability_type
+  - max_hours_in_range
+  - reason
+- Show guidance:
+  - preferred = best time
+  - available = allowed
+  - discouraged = allowed but avoided
+  - unavailable = forbidden
+
+5. AdminDashboardPage
+- Cards:
+  - teachers
+  - courses
+  - sections
+  - rooms
+  - active term
+  - latest schedule run status
+
+6. AcademicTermsPage
+7. ProgramsPage
+8. CyclesPage
+9. SectionsPage
+10. CoursesPage
+11. RoomsPage
+12. TimeSlotsPage
+13. CourseOfferingsPage
+
+Each CRUD page:
+- List table
+- Create form
+- Edit form
+- Delete action
+- Basic validation
+
+14. GenerateSchedulePage
+Fields:
+- academic_term_id
+- random_seed
+- max_seconds
+- candidate_count
+- weights advanced panel
+- respect_manual_locks
+- publish_on_success
+Button:
+- "Generate Schedule with OR-Tools"
+
+After generation show:
+- status badge
+- objective value
+- soft penalty
+- hard conflicts
+- diversity score
+- link to detail page
+- diagnostics if infeasible
+
+15. ScheduleRunDetailPage
+Show:
+- status
+- metrics
+- schedule grids
+- assignments
+- conflicts
+- export buttons
+- publish button
+
+16. ScheduleBySectionPage
+- Weekly grid per section.
+
+17. ScheduleByTeacherPage
+- Weekly grid per teacher.
+
+18. ScheduleByRoomPage
+- Weekly grid per room.
+
+19. ConflictsPage
+- List conflicts and diagnostics.
+- Severity badges.
+
+20. RecommendationsPage
+- Select course offering.
+- Click "Recommend time slots".
+- Show top recommendations with explanation.
+
+------------------------------------------------------------
+Frontend UI Rules
+------------------------------------------------------------
+
+- Keep it simple and contest-demo friendly.
+- Use clear buttons and tables.
+- Use weekly grid layout.
+- Use colors or badges:
+  - OPTIMAL = green
+  - FEASIBLE = blue
+  - INFEASIBLE = red
+  - FAILED = gray
+- Do not build overly fancy UI that delays implementation.
+- Make sure the demo flow works.
+
+============================================================
+SEED DATA
+============================================================
+
+Create a seed script.
+
+Seed:
+
+Users:
+1 admin:
+- email: admin@example.com
+- password: admin123456
+- role: admin
+
+Teachers:
+At least 6 teachers:
+1. Ana Rojas
+   - full_time
+   - theory_teacher
+   - max_weekly_hours 20
+   - max_daily_hours 6
+   - max_consecutive_blocks 3
+   - preferred morning
+2. Luis Vega
+   - part_time
+   - lab_teacher
+   - max_weekly_hours 8
+   - max_daily_hours 4
+   - max_consecutive_blocks 2
+   - preferred evening
+3. Carmen Diaz
+   - full_time
+   - mixed
+   - max_weekly_hours 22
+   - max_daily_hours 6
+   - max_consecutive_blocks 3
+4. Marco Torres
+   - extended_availability
+   - workshop_teacher
+   - max_weekly_hours 28
+   - max_daily_hours 8
+   - max_consecutive_blocks 4
+5. Elena Ramos
+   - part_time
+   - theory_teacher
+   - max_weekly_hours 10
+   - max_daily_hours 4
+   - max_consecutive_blocks 2
+6. Pedro Salas
+   - full_time
+   - computer_lab
+   - max_weekly_hours 20
+   - max_daily_hours 6
+   - max_consecutive_blocks 3
+
+Availability:
+- Give each teacher realistic availability.
+- Include preferred, available, discouraged, and unavailable examples.
+- Make the seed data feasible.
+
+Programs:
+- Industrial Mechanics
+- Software Development
+
+Cycles:
+- Cycle 1 and Cycle 2 for each program
+
+Sections:
+- IM-C1-A morning, 30 students
+- IM-C1-B afternoon, 28 students
+- SD-C1-A morning, 25 students
+- SD-C2-A evening, 22 students
+
+Courses:
+At least 10:
+- MAT101 Applied Mathematics, weekly_hours 4, duration 2, classroom
+- COM101 Technical Communication, weekly_hours 2, duration 2, classroom
+- MEC101 Basic Mechanics, weekly_hours 4, duration 2, workshop
+- SAF101 Industrial Safety, weekly_hours 2, duration 2, classroom
+- CAD101 Technical Drawing, weekly_hours 4, duration 2, computer_lab
+- PRG101 Programming Fundamentals, weekly_hours 4, duration 2, computer_lab
+- DB101 Databases, weekly_hours 4, duration 2, computer_lab
+- ELE101 Basic Electricity, weekly_hours 4, duration 2, lab
+- QLT101 Quality Control, weekly_hours 2, duration 2, classroom
+- ETH101 Professional Ethics, weekly_hours 2, duration 2, classroom
+
+Rooms:
+- A101 classroom capacity 40
+- A102 classroom capacity 35
+- A201 classroom capacity 30
+- LAB1 lab capacity 28
+- LABPC1 computer_lab capacity 30
+- TALLER1 workshop capacity 35
+
+Time slots:
+- Monday-Saturday
+- Morning: 07:00-08:00, 08:00-09:00, 09:00-10:00, 10:00-11:00, 11:00-12:00
+- Afternoon: 13:00-14:00, 14:00-15:00, 15:00-16:00, 16:00-17:00
+- Evening: 18:00-19:00, 19:00-20:00, 20:00-21:00, 21:00-22:00
+
+Course offerings:
+- Create enough offerings for all sections.
+- Assign teachers realistically.
+- Ensure at least one lab bottleneck but still feasible.
+- Ensure at least one part-time teacher has limited availability.
+
+Manual locks:
+- Seed one optional manual lock that does not break feasibility.
+
+============================================================
+TEST REQUIREMENTS
+============================================================
+
+Add backend tests.
+
+Tests must include:
+
+1. Auth
+- Teacher can register.
+- User can login.
+- Password is not stored as plaintext.
+
+2. Availability
+- Teacher can create availability.
+- Unavailable block overrides available block.
+
+3. Scheduler feasible case
+- Seed data generates OPTIMAL or FEASIBLE.
+- Assignments are saved.
+
+4. Teacher conflict
+- No teacher is assigned to two sessions covering the same atomic slot.
+
+5. Section conflict
+- No section has two sessions covering the same atomic slot.
+
+6. Room conflict
+- No room has two sessions covering the same atomic slot.
+
+7. Teacher unavailable
+- No assignment is placed in a teacher unavailable block.
+
+8. Lab compatibility
+- Course requiring lab/computer_lab/workshop uses compatible room.
+
+9. Max weekly hours
+- Part-time teacher max weekly hours is respected.
+
+10. Max daily hours
+- Teacher max daily hours is respected.
+
+11. Consecutive blocks
+- Teacher max consecutive blocks is respected.
+
+12. Infeasible case
+- Create an impossible case.
+- Solver returns infeasible or failed with useful diagnostics.
+
+13. Recommendations
+- Recommendation endpoint returns top placements with explanations.
+
+Tests can use a test PostgreSQL database if practical.
+If setting up test PostgreSQL is too heavy, document it and still provide test configuration. Prefer using PostgreSQL.
+
+============================================================
+README REQUIREMENTS
+============================================================
+
+Create a README.md with:
+
+1. Project overview.
+2. Main features.
+3. Tech stack.
+4. Architecture diagram in text.
+5. How OR-Tools CP-SAT is used.
+6. Hard constraints.
+7. Soft constraints.
+8. Controlled variability explanation.
+9. Database schema overview.
+10. API overview.
+11. Frontend pages.
+12. Local setup:
+    - install backend dependencies
+    - run PostgreSQL with docker-compose
+    - configure .env
+    - run Alembic migrations
+    - seed database
+    - start backend
+    - start frontend
+13. Default demo credentials.
+14. How to generate a schedule.
+15. How to run tests.
+16. Known MVP limitations.
+17. Future improvements:
+    - drag-and-drop schedule editor
+    - background job queue
+    - advanced infeasibility analysis
+    - multi-campus support
+    - teacher workload analytics
+    - mobile view
+    - AI assistant for schedule explanation
+
+============================================================
+ENVIRONMENT FILES
+============================================================
+
+Create backend/.env.example:
+
+DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/academic_scheduler
+SECRET_KEY=change-me
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+BACKEND_CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+Create frontend/.env.example:
+
+VITE_API_BASE_URL=http://localhost:8000
+
+Create docker-compose.yml at root:
+
+Services:
+- postgres
+  image: postgres:16
+  environment:
+    POSTGRES_USER=postgres
+    POSTGRES_PASSWORD=postgres
+    POSTGRES_DB=academic_scheduler
+  ports:
+    - "5432:5432"
+  volumes:
+    - postgres_data:/var/lib/postgresql/data
+
+Optional:
+- pgadmin if easy, but not required.
+
+============================================================
+BACKEND IMPLEMENTATION DETAILS
+============================================================
+
+FastAPI:
+- main.py creates app.
+- Include CORS.
+- Include router prefix /api.
+- Health endpoint:
+  GET /health
+
+SQLAlchemy:
+- Use session dependency.
+- Use relationships.
+- Use JSONB for metadata fields.
+
+Alembic:
+- Configure migrations.
+- Create initial migration.
+
+Security:
+- Password hashing.
+- JWT token creation and verification.
+- Role-based dependencies.
+
+Validation:
+- Pydantic schemas for create/update/read.
+- Validate times.
+- Validate positive hours.
+- Validate room capacity.
+
+Audit:
+- For create/update/delete important entities, write audit log.
+- Keep it simple.
+
+Error handling:
+- Return clear HTTP errors.
+- Do not expose stack traces.
+
+============================================================
+SCHEDULER IMPLEMENTATION DETAILS
+============================================================
+
+The scheduler should be understandable and testable.
+
+Create these files:
+
+data_loader.py
+- Loads data from DB for an academic term.
+- Converts ORM models to DTOs.
+- Loads previous term assignments.
+- Loads manual locks.
+
+domain.py
+- Expands course offerings into sessions.
+- Computes feasible start slots.
+- Computes covered slots for each session placement.
+- Filters impossible placements.
+- Returns domains and pre-solve diagnostics.
+
+constraints.py
+- Functions that add hard constraints:
+  - add_session_assignment_constraints
+  - add_teacher_no_overlap_constraints
+  - add_section_no_overlap_constraints
+  - add_room_no_overlap_constraints
+  - add_teacher_load_constraints
+  - add_teacher_daily_constraints
+  - add_teacher_consecutive_constraints
+  - add_manual_lock_constraints
+
+solver.py
+- Orchestrates CP-SAT model creation.
+- Creates variables.
+- Adds constraints.
+- Adds objective.
+- Runs solver.
+- Maps status.
+- Extracts assignments.
+
+scorer.py
+- Builds soft penalty terms.
+- Computes post-solve metrics.
+- Computes diversity score.
+- Computes penalty breakdown.
+
+diagnostics.py
+- Pre-solve validation.
+- Infeasibility messages.
+- Conflict record creation.
+
+recommendations.py
+- Recommends top placements for one course offering.
+
+persistence.py
+- Saves schedule run.
+- Saves assignments.
+- Saves assignment slots.
+- Saves conflicts.
+
+utils.py
+- Time helpers.
+- Slot grouping.
+- Consecutive slot detection.
+
+============================================================
+CONSTRAINT MODELING GUIDE
+============================================================
+
+Use atomic time slots and duration coverage.
+
+Example:
+slot Monday block 1 = 07:00-08:00
+slot Monday block 2 = 08:00-09:00
+session duration_blocks = 2
+start at block 1 covers block 1 and block 2.
+
+Feasible placement:
+(session_id, start_slot_id, room_id)
+
+Variable:
+x[(session_id, start_slot_id, room_id)] = model.NewBoolVar(...)
+
+Every session:
+model.AddExactlyOne(x for all placements of session)
+
+Teacher overlap:
+For each teacher and atomic slot:
+model.Add(sum(x for placements of that teacher covering atomic slot) <= 1)
+
+Section overlap:
+For each section and atomic slot:
+model.Add(sum(x for placements of that section covering atomic slot) <= 1)
+
+Room overlap:
+For each room and atomic slot:
+model.Add(sum(x for placements in that room covering atomic slot) <= 1)
+
+Daily hours:
+For each teacher and day:
+model.Add(sum(duration_blocks * x for placements of teacher on day) <= teacher.max_daily_hours)
+
+Weekly hours:
+For each teacher:
+model.Add(sum(duration_blocks * x for placements of teacher) <= teacher.max_weekly_hours)
+
+Consecutive blocks:
+Create teacher_busy[(teacher_id, slot_id)] BoolVar or IntVar linked to placements.
+For each teacher/day/window:
+model.Add(sum(teacher_busy for slots in window) <= max_consecutive_blocks)
+
+Manual lock:
+Find placement matching lock.
+model.Add(x[matching_placement] == 1)
+If no matching placement, diagnostic: manual lock impossible.
+
+Objective:
+penalty_terms = []
+Add weighted linear penalty terms.
+model.Minimize(sum(penalty_terms))
+
+============================================================
+IMPORTANT SCHEDULER EDGE CASES
+============================================================
+
+Handle:
+
+1. Offering has no feasible placement.
+Return infeasible diagnostic.
+
+2. Teacher has no availability.
+Return diagnostic.
+
+3. Course requires lab but no lab room exists.
+Return diagnostic.
+
+4. Room capacity too small.
+Return diagnostic.
+
+5. Manual lock impossible.
+Return diagnostic.
+
+6. Time slot duration cannot fit at end of day.
+Do not create placement.
+
+7. Overlapping availability ranges.
+Resolve with precedence:
+unavailable > preferred > available > discouraged.
+Actually discouraged should be allowed, unavailable forbidden. If both unavailable and preferred overlap, unavailable wins.
+
+8. Missing teacher profile limits.
+Use safe defaults but warn in diagnostics.
+
+9. Previous term missing.
+Do not penalize diversity.
+
+10. candidate_count too high.
+Limit to reasonable max, for example 10.
+
+============================================================
+SCHEDULE VIEW LOGIC
+============================================================
+
+Backend should provide assignments grouped by:
+
+By section:
+{
+  section_id,
+  section_name,
+  days: {
+    monday: [
+      {
+        start_time,
+        end_time,
+        course_name,
+        teacher_name,
+        room_code
+      }
+    ]
+  }
+}
+
+By teacher:
+similar, with section and room.
+
+By room:
+similar, with course, section, teacher.
+
+Frontend ScheduleGrid:
+- Takes grouped assignments.
+- Renders days as columns and time slots as rows.
+- Shows course, teacher, section, room.
+- Keep it readable.
+
+============================================================
+QUALITY AND STYLE
+============================================================
+
+Backend:
+- Type hints.
+- Clear service boundaries.
+- No giant route files.
+- No hardcoded DB credentials except .env.example.
+- No plaintext passwords.
+- No silent failures.
+- Meaningful error messages.
+- Tests for core logic.
+
+Frontend:
+- TypeScript types.
+- Clear API client.
+- Simple reusable components.
+- Good loading and error states.
+- Forms should be basic but functional.
+
+Scheduler:
+- Keep domain preprocessing separate from solver constraints.
+- Log useful metadata.
+- Keep penalty weights configurable.
+- Avoid creating variables for impossible placements.
+- Preserve explainability.
+
+============================================================
+IMPLEMENTATION ORDER
+============================================================
+
+Follow this order:
+
+1. Inspect repository.
+2. Create monorepo structure if needed.
+3. Add docker-compose.yml for PostgreSQL.
+4. Create backend project.
+5. Add config, DB session, SQLAlchemy base.
+6. Add models and enums.
+7. Configure Alembic and create initial migration.
+8. Add auth and user registration/login.
+9. Add teacher profile and availability APIs.
+10. Add academic data CRUD APIs.
+11. Add seed script with demo data.
+12. Implement scheduler DTOs and data loader.
+13. Implement domain preprocessing.
+14. Implement OR-Tools CP-SAT solver.
+15. Implement schedule run generation endpoint.
+16. Implement persistence of assignments/conflicts.
+17. Implement infeasibility diagnostics.
+18. Implement recommendations endpoint.
+19. Implement Excel/PDF exports.
+20. Create frontend project.
+21. Add auth flow.
+22. Add admin dashboard and CRUD pages.
+23. Add teacher profile and availability pages.
+24. Add schedule generation page.
+25. Add schedule viewer pages.
+26. Add conflicts and recommendations pages.
+27. Add tests.
+28. Add README.md.
+29. Run lint/tests/build.
+30. Fix errors.
+31. Provide final summary of what was implemented and how to run it.
+
+============================================================
+ACCEPTANCE CRITERIA
+============================================================
+
+The project is complete when:
+
+1. docker-compose up starts PostgreSQL.
+2. Backend starts successfully.
+3. Frontend starts successfully.
+4. Alembic migrations run successfully.
+5. Seed script creates demo data.
+6. Admin can login.
+7. Teacher can register.
+8. Teacher can define availability.
+9. Admin can manage academic data.
+10. Admin can generate schedule using OR-Tools.
+11. Generated schedule is stored in DB.
+12. Generated schedule can be viewed by section.
+13. Generated schedule can be viewed by teacher.
+14. Generated schedule can be viewed by room.
+15. Hard constraints are respected.
+16. Soft penalty score is calculated.
+17. Diversity score is calculated when previous term data exists.
+18. Infeasible case returns readable diagnostics.
+19. Recommendation endpoint returns useful suggestions.
+20. Excel export works.
+21. PDF export works, even if simple.
+22. Tests pass for core scheduler constraints.
+23. README explains local setup and demo flow.
+
+============================================================
+DEMO FLOW FOR README
+============================================================
+
+Include this demo flow:
+
+1. Start PostgreSQL:
+   docker-compose up -d
+
+2. Backend:
+   cd backend
+   create virtualenv
+   install requirements
+   alembic upgrade head
+   python -m app.db.seed
+   uvicorn app.main:app --reload
+
+3. Frontend:
+   cd frontend
+   npm install
+   npm run dev
+
+4. Login as admin:
+   admin@example.com
+   admin123456
+
+5. Open Admin Dashboard.
+
+6. Review teachers, courses, sections, rooms, time slots, and offerings.
+
+7. Go to Generate Schedule.
+
+8. Select active academic term.
+
+9. Use:
+   random_seed = 42
+   max_seconds = 20
+   candidate_count = 3
+
+10. Click:
+   Generate Schedule with OR-Tools
+
+11. View result:
+   - Status
+   - Objective value
+   - Soft penalty
+   - Diversity score
+   - Assignments by section
+   - Assignments by teacher
+   - Assignments by room
+
+12. Export Excel/PDF.
+
+============================================================
+MVP LIMITATIONS TO DOCUMENT
+============================================================
+
+Document these limitations honestly:
+
+- The MVP assumes fixed teacher-course assignments before solving.
+- The MVP uses atomic one-hour blocks.
+- The MVP validates weekly_hours divisible by session_duration_blocks.
+- The MVP does not implement drag-and-drop editing yet.
+- The MVP uses simple JWT auth, not OAuth.
+- The MVP uses a basic gap penalty approximation.
+- The MVP is designed for local deployment and contest demo, not large multi-campus production yet.
+
+============================================================
+FUTURE IMPROVEMENTS TO DOCUMENT
+============================================================
+
+Add future improvements:
+
+- Drag-and-drop schedule editor.
+- Background worker for long solver runs.
+- Advanced CP-SAT interval variables.
+- Better gap modeling.
+- Teacher assignment optimization.
+- Multi-objective Pareto schedule alternatives.
+- What-if simulation.
+- Multi-campus travel-time constraints.
+- Student elective conflict handling.
+- AI assistant for explaining schedule decisions.
+- Mobile teacher portal.
+- Calendar integration.
+- Import/export from Excel templates.
+- Real-time collaborative schedule editing.
+
+============================================================
+FINAL INSTRUCTIONS
+============================================================
+
+Do not only describe the solution. Implement it.
+
+Make practical decisions when details are missing.
+
+Keep the code runnable.
+
+After implementation:
+1. List changed/created files.
+2. Explain how to run the project.
+3. Explain how to run migrations and seed data.
+4. Explain how to generate a schedule.
+5. Explain how OR-Tools is used.
+6. Explain any known limitations.
+7. Show test command results or explain if tests could not be run.
+
+Start now by inspecting the repository, then build the complete project.

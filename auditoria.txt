@@ -1,0 +1,119 @@
+LO QUE SE HIZO:
+
+- Prompt maestro presente: `prompt.txt` define stack, arquitectura, endpoints, modelo OR-Tools, seed, tests y docs.
+
+- Estructura monorepo creada:
+  - `backend/` (FastAPI + SQLAlchemy + Alembic + OR-Tools)
+  - `frontend/` (Vite + React + TypeScript + React Router + TanStack Query)
+  - `docker-compose.yml` para PostgreSQL.
+  - `.env.example` en root, `backend/.env.example` y `frontend/.env.example`.
+  - `README.md` con setup local, endpoints, flujo demo, limitaciones.
+  - `AGENTS.md` con reglas/coding standards.
+
+- Backend implementado (FastAPI):
+  - App y healthcheck: `backend/app/main.py` expone `GET /health` y monta API en `/api`.
+  - Config y seguridad: `backend/app/core/config.py`, `backend/app/core/security.py`, `backend/app/core/enums.py`.
+  - JWT auth:
+    - `POST /api/auth/register-teacher`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/create-admin` (`backend/app/api/routes/auth.py`).
+  - Dependencias de autorización: `require_admin`, `require_teacher_or_admin` (`backend/app/api/deps.py`).
+  - CRUD académico (incluye manual locks y room unavailability): `backend/app/api/routes/academic.py`.
+    - Terms, programs, cycles, sections (con filtros), courses (valida divisibilidad), rooms (con filtros), room unavailability, time slots (incluye bulk-generate), course offerings.
+    - Manual locks: `GET /api/manual-locks`, `POST /api/manual-locks`, `DELETE /api/manual-locks/{id}`.
+  - Teachers:
+    - `GET /api/teachers` (admin), `GET/PUT /api/teachers/{id}/profile`, CRUD de disponibilidad por teacher.
+    - Endpoints “me”: `GET/PUT /api/me/teacher-profile`, `GET/POST /api/me/availability`.
+  - Scheduling:
+    - `POST /api/schedule-runs/generate` crea run, ejecuta solver, guarda resultados y auditoría.
+    - List/get runs, assignments (raw y agrupados por section/teacher/room), conflicts, publish, delete.
+    - Recommendations: `POST /api/recommendations/course-offering/{course_offering_id}`.
+  - Export:
+    - `GET /api/exports/schedule-runs/{id}/excel` y `/pdf` (StreamingResponse) (`backend/app/api/routes/exports.py`).
+  - Audit logs:
+    - `GET /api/audit` (admin) lista últimos 200 (`backend/app/api/routes/audit.py`).
+
+- Base de datos (SQLAlchemy + Alembic):
+  - Modelos presentes para usuarios/teacher/academic/rooms/scheduling/audit:
+    - `backend/app/models/user.py`, `teacher.py`, `academic.py`, `room.py`, `schedule.py`, `audit.py`.
+  - Migración inicial Alembic creada: `backend/alembic/versions/202605250001_initial_scheduler_schema.py`.
+
+- Scheduler (OR-Tools CP-SAT) implementado:
+  - Carga de datos: `backend/app/services/scheduler/data_loader.py`.
+  - DTOs/modelos internos: `backend/app/services/scheduler/models.py`.
+  - Preprocesamiento de dominio y diagnóstico pre-solve: `backend/app/services/scheduler/domain.py`.
+  - Hard constraints y variables auxiliares (no-overlap, loads, consecutivos, manual locks): `backend/app/services/scheduler/constraints.py`.
+  - Solver CP-SAT + candidate_count + random_seed + diversidad (penaliza repetición): `backend/app/services/scheduler/solver.py`.
+  - Scoring/weights/diversity/metrics: `backend/app/services/scheduler/scorer.py`.
+  - Recomendaciones: `backend/app/services/scheduler/recommendations.py`.
+  - Persistencia de resultados (runs, assignments, slots coverage, conflicts, publish): `backend/app/services/scheduler/persistence.py`.
+
+- Seed data para demo:
+  - Script: `backend/app/db/seed.py`.
+  - Crea admin, term, programs, cycles, sections, 6 teachers + availability, rooms, time slots, courses, course offerings y 1 manual lock.
+
+- Tests backend (pytest) presentes:
+  - `backend/app/tests/test_auth.py`
+  - `backend/app/tests/test_teacher_availability.py`
+  - `backend/app/tests/test_scheduler_feasible.py`
+  - `backend/app/tests/test_scheduler_constraints.py`
+  - `backend/app/tests/test_scheduler_infeasible.py`
+  - `backend/app/tests/test_recommendations.py`
+
+- Frontend implementado (Vite React TS):
+  - Ruteo principal: `frontend/src/App.tsx`.
+  - Login y registro teacher: `LoginPage.tsx`, `RegisterTeacherPage.tsx` + API client (`frontend/src/api/*`).
+  - Layout + navegación: `components/Layout.tsx`, `Navbar.tsx`, `Sidebar.tsx`, `ProtectedRoute.tsx`.
+  - Páginas creadas para:
+    - Dashboard
+    - Teacher Profile
+    - Teacher Availability (alta de bloques)
+    - CRUD pages (terms/programs/cycles/sections/courses/rooms/time slots/offerings)
+    - Generate schedule
+    - Schedule run detail
+    - Schedules by section/teacher/room
+    - Conflicts
+    - Recommendations
+  - Componentes utilitarios: `DataTable`, `FormField`, `ScheduleGrid`, `StatusBadge`, `Loading`, `ErrorMessage`.
+
+
+LO QUE FALTA POR HACER:
+
+- Frontend: CRUD real (editar/eliminar).
+  - Actualmente `frontend/src/pages/CrudPage.tsx` solo hace LIST + CREATE; no hay UI para UPDATE/DELETE en términos, programas, ciclos, secciones, cursos, rooms, time slots y offerings.
+
+- Frontend: manual locks no tiene página.
+  - Backend expone `/api/manual-locks`, pero en `frontend/src/App.tsx` / `Sidebar.tsx` no existe `ManualLocksPage` ni flujo para crear/eliminar locks desde UI.
+
+- Frontend: control por rol (admin vs teacher) y redirección post-login.
+  - `ProtectedRoute.tsx` solo valida token; no valida rol ni restringe rutas.
+  - `Sidebar.tsx` muestra links de admin a cualquier usuario; un teacher verá 403 en backend.
+  - Requisito del prompt: “Redirect based on role” en LoginPage; esto no se ve implementado en la protección de rutas.
+
+- Frontend: Teacher Profile no permite actualizar.
+  - `TeacherProfilePage.tsx` solo muestra datos (`DataTable`), no usa `PUT /api/me/teacher-profile`.
+
+- Frontend: Teacher Availability incompleto (solo alta).
+  - `TeacherAvailabilityPage.tsx` solo agrega bloques; no hay UI para actualizar/eliminar (backend sí tiene PUT/DELETE para availability).
+
+- Frontend: GenerateSchedulePage no implementa panel de pesos (weights).
+  - El prompt exige “weights advanced panel”; `GenerateSchedulePage.tsx` no envía `weights` ni tiene UI para configurarlos.
+
+- Frontend: ScheduleRunDetailPage sin acciones de publicación.
+  - Backend expone `POST /api/schedule-runs/{id}/publish`, pero `ScheduleRunDetailPage.tsx` no muestra botón/flujo para publicar.
+
+- Exports: endpoints “teacher/section” no filtran.
+  - En backend `backend/app/api/routes/exports.py`:
+    - `/exports/schedule-runs/{run_id}/teacher/{teacher_id}/excel` devuelve el excel completo del run (ignora teacher_id).
+    - `/exports/schedule-runs/{run_id}/section/{section_id}/pdf` devuelve el pdf completo del run (ignora section_id).
+  - En frontend `frontend/src/api/exports.ts` solo existen exportaciones completas del run; no hay export por teacher/section.
+
+- Auditoría: falta UI para consultar audit logs.
+  - Backend tiene `GET /api/audit` pero no existe página en frontend para visualizarlo.
+
+- Diagnósticos de infeasibilidad: cobertura parcial vs prompt.
+  - Existe validación en `domain.py` (time slots, rooms, offerings, teacher availability, max weekly hours, compatibilidad room, manual locks), pero no están implementadas explícitamente varias validaciones listadas en el prompt (por ejemplo: “section total weekly hours > available slots for shift” y otras reglas detalladas). Si se requiere cumplir el listado del prompt 1:1, faltan esos diagnósticos.
+
+- Teacher “ver su horario asignado” como flujo dedicado.
+  - Hay páginas “Schedule by Teacher” y endpoints agrupados, pero no hay un flujo “mi horario” que auto-filtre por el teacher autenticado (UI y/o endpoint dedicado), como describe el prompt para rol Teacher.
+
+- Limpieza/consistencia del repo (no solicitada por prompt, pero observable):
+  - Hay artefactos de Next.js/Prisma en la raíz (`next.config.ts`, `prisma/`, `next-env.d.ts`, `.next/`) que no forman parte del stack descrito en `prompt.txt` (Vite + FastAPI + Postgres). Si el objetivo es alinearse estrictamente al prompt, falta decidir si se eliminan o se documenta que son residuos/no usados.

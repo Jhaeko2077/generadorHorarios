@@ -30,8 +30,19 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (examples are intentionally committed)
+.env
+.env.local
+.env.*.local
+
+# academic scheduler
+backend/.venv/
+backend/.env
+backend/.pytest_cache/
+backend/htmlcov/
+frontend/node_modules/
+frontend/dist/
+frontend/.env
 
 # vercel
 .vercel
@@ -39,3 +50,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.pycache_compile/
