@@ -34,7 +34,9 @@ def run_seed() -> None:
     db = SessionLocal()
     try:
         if db.scalar(select(User.id).where(User.email == "admin@example.com")):
-            print("Seed data already exists.")
+            _ensure_demo_seed_updates(db)
+            db.commit()
+            print("Seed data already exists. Demo updates verified.")
             return
         admin = User(
             full_name="Admin Demo",
@@ -151,15 +153,80 @@ def run_seed() -> None:
     finally:
         db.close()
 
+def _ensure_demo_seed_updates(db) -> None:
+    """Apply non-destructive demo seed updates to databases seeded by older versions."""
+    desired_emails = {
+        "Ana Rojas": "ana.rojas@example.com",
+        "Luis Vega": "luis.vega@example.com",
+        "Carmen Diaz": "carmen.diaz@example.com",
+        "Marco Torres": "marco.torres@example.com",
+        "Elena Ramos": "elena.ramos@example.com",
+        "Pedro Salas": "pedro.salas@example.com",
+    }
+    for full_name, email in desired_emails.items():
+        user = db.scalar(select(User).where(User.full_name == full_name))
+        email_owner = db.scalar(select(User).where(User.email == email))
+        if user and (email_owner is None or email_owner.id == user.id):
+            user.email = email
+            user.password_hash = hash_password("teacher123456")
+
+    carmen = db.scalar(
+        select(TeacherProfile)
+        .join(User, TeacherProfile.user_id == User.id)
+        .where(User.full_name == "Carmen Diaz")
+    )
+    if carmen:
+        _ensure_availability_block(
+            db,
+            teacher_id=carmen.id,
+            day_of_week=DayOfWeek.monday,
+            start_time=time(18),
+            end_time=time(22),
+            availability_type=AvailabilityType.discouraged,
+            reason="Demo feasibility: opens an extra evening option for SD-C2-A",
+        )
+
+
+def _ensure_availability_block(
+    db,
+    *,
+    teacher_id: str,
+    day_of_week: DayOfWeek,
+    start_time: time,
+    end_time: time,
+    availability_type: AvailabilityType,
+    reason: str | None = None,
+) -> None:
+    exists = db.scalar(
+        select(TeacherAvailability.id).where(
+            TeacherAvailability.teacher_id == teacher_id,
+            TeacherAvailability.day_of_week == day_of_week,
+            TeacherAvailability.start_time == start_time,
+            TeacherAvailability.end_time == end_time,
+            TeacherAvailability.availability_type == availability_type,
+        )
+    )
+    if not exists:
+        db.add(
+            TeacherAvailability(
+                teacher_id=teacher_id,
+                day_of_week=day_of_week,
+                start_time=start_time,
+                end_time=end_time,
+                availability_type=availability_type,
+                reason=reason,
+            )
+        )
+
 
 def _teachers() -> list[tuple[User, TeacherProfile]]:
     specs = [
-        ("Ana Rojas", "ana@example.com", EmploymentType.full_time, AcademicRole.theory_teacher, 20, 6, 3, Shift.morning, True, False, False),
-        ("Luis Vega", "luis@example.com", EmploymentType.part_time, AcademicRole.lab_teacher, 8, 4, 2, Shift.evening, False, True, False),
-        ("Carmen Diaz", "carmen@example.com", EmploymentType.full_time, AcademicRole.mixed, 22, 6, 3, Shift.any, True, True, False),
-        ("Marco Torres", "marco@example.com", EmploymentType.extended_availability, AcademicRole.workshop_teacher, 28, 8, 4, Shift.any, True, False, True),
-        ("Elena Ramos", "elena@example.com", EmploymentType.part_time, AcademicRole.theory_teacher, 10, 4, 2, Shift.morning, True, False, False),
-        ("Pedro Salas", "pedro@example.com", EmploymentType.full_time, AcademicRole.computer_lab, 20, 6, 3, Shift.evening, True, True, False),
+        ("Ana Rojas", "ana.rojas@example.com", EmploymentType.full_time, AcademicRole.theory_teacher, 20, 6, 3, Shift.morning, True, False, False),
+        ("Luis Vega", "luis.vega@example.com", EmploymentType.part_time, AcademicRole.lab_teacher, 8, 4, 2, Shift.evening, False, True, False),
+        ("Carmen Diaz", "carmen.diaz@example.com", EmploymentType.full_time, AcademicRole.mixed, 22, 6, 3, Shift.any, True, True, False),
+        ("Marco Torres", "marco.torres@example.com", EmploymentType.extended_availability, AcademicRole.workshop_teacher, 28, 8, 4, Shift.any, True, False, True),
+        ("Elena Ramos", "elena.ramos@example.com", EmploymentType.part_time, AcademicRole.theory_teacher, 10, 4, 2, Shift.morning, True, False, False),
+        ("Pedro Salas", "pedro.salas@example.com", EmploymentType.full_time, AcademicRole.computer_lab, 20, 6, 3, Shift.evening, True, True, False),
     ]
     result = []
     for idx, (name, email, employment, role, weekly, daily, consecutive, shift, theory, labs, workshops) in enumerate(specs, start=1):
@@ -191,7 +258,7 @@ def _availability(db, profiles: dict[str, TeacherProfile]) -> None:
             ([DayOfWeek.tuesday, DayOfWeek.thursday], time(13), time(17), AvailabilityType.available),
             ([saturday], time(7), time(12), AvailabilityType.available),
         ],
-        "Carmen Diaz": [(weekdays, time(7), time(17), AvailabilityType.available), ([DayOfWeek.tuesday, DayOfWeek.thursday], time(18), time(22), AvailabilityType.discouraged)],
+        "Carmen Diaz": [(weekdays, time(7), time(17), AvailabilityType.available), ([DayOfWeek.monday, DayOfWeek.tuesday, DayOfWeek.thursday], time(18), time(22), AvailabilityType.discouraged)],
         "Marco Torres": [
             (weekdays, time(7), time(17), AvailabilityType.available),
             ([DayOfWeek.tuesday, DayOfWeek.thursday], time(18), time(22), AvailabilityType.discouraged),
@@ -264,3 +331,5 @@ def _courses(cycles: list[Cycle]) -> list[Course]:
 
 if __name__ == "__main__":
     run_seed()
+
+

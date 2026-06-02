@@ -26,27 +26,27 @@ export default function GenerateSchedulePage() {
   const termId = form.academic_term_id || terms.data?.[0]?.id || "";
   return (
     <div>
-      <h1>Generate Schedule</h1>
+      <h1>Generar horario</h1>
       <form className="panel formGrid" onSubmit={(event) => { event.preventDefault(); mutation.mutate({ ...form, academic_term_id: termId, weights }); }}>
-        <label className="field"><span>Academic term</span><select value={termId} onChange={(event) => setForm({ ...form, academic_term_id: event.target.value })}>{terms.data?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-        <label className="field"><span>Random seed</span><input type="number" value={form.random_seed} onChange={(e) => setForm({ ...form, random_seed: Number(e.target.value) })} /></label>
-        <label className="field"><span>Max seconds</span><input type="number" value={form.max_seconds} onChange={(e) => setForm({ ...form, max_seconds: Number(e.target.value) })} /></label>
-        <label className="field"><span>Candidate count</span><input type="number" value={form.candidate_count} onChange={(e) => setForm({ ...form, candidate_count: Number(e.target.value) })} /></label>
-        <label className="field checkbox"><input type="checkbox" checked={form.respect_manual_locks} onChange={(e) => setForm({ ...form, respect_manual_locks: e.target.checked })} />Respect manual locks</label>
-        <label className="field checkbox"><input type="checkbox" checked={form.publish_on_success} onChange={(e) => setForm({ ...form, publish_on_success: e.target.checked })} />Publish on success</label>
-        <button>Generate Schedule with OR-Tools</button>
+        <label className="field"><span>Periodo academico</span><select value={termId} onChange={(event) => setForm({ ...form, academic_term_id: event.target.value })}>{terms.data?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        <label className="field"><span>Semilla aleatoria</span><input type="number" value={form.random_seed} onChange={(e) => setForm({ ...form, random_seed: Number(e.target.value) })} /></label>
+        <label className="field"><span>Segundos maximos</span><input type="number" value={form.max_seconds} onChange={(e) => setForm({ ...form, max_seconds: Number(e.target.value) })} /></label>
+        <label className="field"><span>Candidatos</span><input type="number" value={form.candidate_count} onChange={(e) => setForm({ ...form, candidate_count: Number(e.target.value) })} /></label>
+        <label className="field checkbox"><input type="checkbox" checked={form.respect_manual_locks} onChange={(e) => setForm({ ...form, respect_manual_locks: e.target.checked })} />Respetar bloqueos manuales</label>
+        <label className="field checkbox"><input type="checkbox" checked={form.publish_on_success} onChange={(e) => setForm({ ...form, publish_on_success: e.target.checked })} />Publicar si tiene exito</label>
+        <button>Generar horario con OR-Tools</button>
       </form>
       <section className="panel">
-        <button className="secondary" onClick={() => setAdvanced((value) => !value)}>{advanced ? "Hide" : "Show"} advanced optimization weights</button>
+        <button className="secondary" onClick={() => setAdvanced((value) => !value)}>{advanced ? "Ocultar" : "Mostrar"} pesos avanzados de optimizacion</button>
         {advanced && (
           <div>
-            <p>Higher weights make the optimizer avoid that condition more strongly while still preserving all hard constraints.</p>
+            <p>Un peso mas alto hace que el optimizador evite con mas fuerza esa condicion, siempre respetando las restricciones duras.</p>
             <div className="formGrid compactWeights">
               {Object.entries(weights).map(([key, value]) => (
                 <label className="field" key={key}><span>{key}</span><input type="number" value={value} onChange={(event) => setWeights({ ...weights, [key]: Number(event.target.value) })} /></label>
               ))}
             </div>
-            <button className="secondary" onClick={() => setWeights(defaultWeights)}>Reset defaults</button>
+            <button className="secondary" onClick={() => setWeights(defaultWeights)}>Restaurar valores</button>
           </div>
         )}
       </section>
@@ -57,12 +57,32 @@ export default function GenerateSchedulePage() {
 }
 
 function Result({ data }: { data: any }) {
+  const diagnostics = Array.isArray(data.diagnostics) ? data.diagnostics : [];
   return (
     <section className="panel">
-      <h2>Generation result <StatusBadge status={data.status} /></h2>
-      <p>Objective: {data.objective_value ?? "n/a"} | Soft penalty: {data.soft_penalty_score} | Hard conflicts: {data.hard_conflicts_count} | Diversity: {data.diversity_score ?? "n/a"}</p>
-      <a href={`/schedule-runs/${data.schedule_run_id}`}>Open schedule run</a>
-      {data.diagnostics?.length ? <pre>{JSON.stringify(data.diagnostics, null, 2)}</pre> : null}
+      <h2>Resultado <StatusBadge status={data.status} /></h2>
+      <p>Objetivo: {data.objective_value ?? "n/a"} | Penalizacion suave: {data.soft_penalty_score} | Conflictos duros: {data.hard_conflicts_count} | Diversidad: {data.diversity_score ?? "n/a"}</p>
+      <a href={`/schedule-runs/${data.schedule_run_id}`}>Abrir ejecucion</a>
+      {diagnostics.length ? (
+        <div className="diagnosticList">
+          <h3>Diagnosticos</h3>
+          <ul>
+            {diagnostics.map((item: any, index: number) => (
+              <li key={`${item.conflict_type || "diagnostic"}-${index}`}>
+                <strong>{item.conflict_type || item.type || "diagnostico"}:</strong> {diagnosticMessage(item)}
+                {item.severity ? <span className="diagnosticMeta"> severidad: {item.severity}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function diagnosticMessage(item: any) {
+  if (typeof item === "string") return item;
+  if (item?.message) return item.message;
+  if (item?.detail) return item.detail;
+  return JSON.stringify(item);
 }

@@ -158,6 +158,7 @@ def validate_obvious_issues(data: SchedulerInput) -> list[Diagnostic]:
 
     diagnostics.extend(_section_load_diagnostics(data))
     diagnostics.extend(_teacher_load_diagnostics(data))
+    diagnostics.extend(_teacher_availability_capacity_diagnostics(data))
 
     for offering in data.offerings:
         teacher = data.teachers.get(offering.teacher_id)
@@ -211,6 +212,10 @@ def validate_manual_locks(data: SchedulerInput, sessions: list[SessionDTO], plac
             diagnostics.append(Diagnostic("manual_lock_teacher_unavailable", "hard", f"Manual lock for {offering.course_name} conflicts with {teacher.full_name}'s availability.", {"course_offering_id": offering.id}))
         if not shift_allows(section.shift, slot.shift):
             diagnostics.append(Diagnostic("manual_lock_section_shift_conflict", "hard", f"Manual lock for {section.name} uses a {slot.shift.value} slot, outside the section shift {section.shift.value}.", {"course_offering_id": offering.id}))
+        if not room_compatible(offering.room_type_required, offering.requires_lab, room.room_type):
+            diagnostics.append(Diagnostic("manual_lock_room_type_conflict", "hard", f"Manual lock uses room {room.code}, which is incompatible with {offering.course_name}.", {"course_offering_id": offering.id, "room_id": room.id}))
+        if room.capacity < section.student_count:
+            diagnostics.append(Diagnostic("manual_lock_room_capacity_conflict", "hard", f"Manual lock uses room {room.code}, but its capacity is below section {section.name} enrollment.", {"course_offering_id": offering.id, "room_id": room.id}))
         if any(slot_id in room.unavailable_slot_ids for slot_id in covered_ids):
             diagnostics.append(Diagnostic("manual_lock_room_unavailable", "hard", f"Manual lock uses room {room.code} during an unavailable room period.", {"room_id": room.id}))
         has_match = any(
@@ -248,6 +253,31 @@ def _teacher_load_diagnostics(data: SchedulerInput) -> list[Diagnostic]:
         teacher = data.teachers.get(teacher_id)
         if teacher and hours > teacher.max_weekly_hours:
             diagnostics.append(Diagnostic("max_weekly_hours_exceeded", "hard", f"{teacher.full_name} has {hours} assigned hours, above max {teacher.max_weekly_hours}.", {"teacher_id": teacher_id}))
+    return diagnostics
+
+
+def _teacher_availability_capacity_diagnostics(data: SchedulerInput) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+    load = Counter()
+    section_shifts: dict[str, set[Shift]] = {}
+    for offering in data.offerings:
+        load[offering.teacher_id] += offering.weekly_hours
+        section = data.sections.get(offering.section_id)
+        if section:
+            section_shifts.setdefault(offering.teacher_id, set()).add(section.shift)
+    for teacher_id, hours in load.items():
+        teacher = data.teachers.get(teacher_id)
+        if not teacher or not teacher.availability_blocks:
+            continue
+        shifts = section_shifts.get(teacher_id, set())
+        available_slots = 0
+        for slot in data.time_slots.values():
+            if shifts and not any(shift_allows(shift, slot.shift) for shift in shifts):
+                continue
+            if classify_teacher_availability(teacher, [slot]) != AvailabilityType.unavailable:
+                available_slots += 1
+        if hours > available_slots:
+            diagnostics.append(Diagnostic("teacher_insufficient_availability", "hard", f"{teacher.full_name} has {hours} assigned weekly hours, but only {available_slots} compatible availability slots.", {"teacher_id": teacher_id}))
     return diagnostics
 
 

@@ -132,3 +132,19 @@ button.small, .button.small { padding: 0.35rem 0.55rem; font-size: 0.78rem; }
 .dangerButton { background: #b42318; }
 .wrapActions { flex-wrap: wrap; }
 .compactWeights { margin: 12px 0; }
+.twoColumn { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; align-items: start; margin-top: 18px; }
+.selectedRow td { background: #eef6f4; }
+.diagnosticList {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #f0b4ad;
+  border-radius: 8px;
+  background: #fff8f7;
+}
+.diagnosticList h3 { margin: 0 0 8px; font-size: 1rem; }
+.diagnosticList ul { margin: 0; padding-left: 18px; }
+.diagnosticList li { margin: 7px 0; }
+.diagnosticMeta { color: #60707d; margin-left: 8px; font-size: 0.85rem; }
+@media (max-width: 900px) {
+  .twoColumn { grid-template-columns: 1fr; }
+}

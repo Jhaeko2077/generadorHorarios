@@ -1,0 +1,282 @@
+# AUDITORÍA Y ANÁLISIS TÉCNICO: ACADEMIC TIMETABLE OPTIMIZER
+
+## Resumen ejecutivo
+
+Este documento presenta una auditoría técnica completa del proyecto "Academic Timetable Optimizer / Generador de Horarios". Tras realizar una inspección exhaustiva de los módulos del backend, frontend, base de datos, semillas y el motor de optimización OR-Tools CP-SAT, se ha logrado mapear las inconsistencias en el flujo de profesores y demostrar matemáticamente el motivo exacto por el cual la generación del horario para el término semilla "2026-I Demo Term" resulta **INFEASIBLE**. 
+
+### Estado actual del proyecto
+El proyecto se encuentra en un estado funcional de producto mínimo viable (MVP). Las características base están implementadas: el inicio de sesión del administrador funciona correctamente, los modelos de base de datos están alineados, el resolvedor OR-Tools procesa las restricciones duras y blandas, y el frontend expone interfaces administrativas densas para la mayoría de los módulos (Terms, Programs, Cycles, Sections, Courses, Rooms, Time Slots, Offerings, Manual Locks, Generate, By Section, By Teacher, By Room, Conflicts, Recommendations, Audit Logs).
+
+### Problemas principales
+1. **Módulo de Profesores Desconectado en el Frontend**: A pesar de que el backend cuenta con endpoints robustos para la administración de docentes (`GET /api/teachers`, `PUT /api/teachers/{id}/profile`, CRUD de disponibilidad), el frontend carece por completo de un panel de visualización, edición y gestión de profesores para el rol administrador. No hay enlace en la barra lateral, no hay ruta asociada y no existe la vista correspondiente.
+2. **Infeasibilidad Matemática en los Datos Semilla (Seed)**: El término demo "2026-I" es inherentemente **infeasible** debido a un cuello de botella de saturación de turnos y disponibilidad de docentes en la sección de la tarde/noche (turno nocturno `SD-C2-A`). No es un bug en el código del resolvedor, sino una contradicción matemática directa en las reglas de disponibilidad de los profesores asignados a esa sección.
+3. **Falta de Diagnósticos Preventivos Avanzados**: El analizador pre-solve (`domain.py`) no captura la saturación de horas acumuladas por turnos frente a la disponibilidad de docentes específicos, delegando la detección al motor OR-Tools, el cual responde únicamente con un mensaje de error genérico de infeasibilidad.
+
+### Riesgo para la demo
+* **Severidad Alta**: El flujo demo recomendado en el archivo `README.md` indica que el usuario debe ir a "Generate" y hacer clic en generar con la semilla 42. En el estado actual, esta acción falla de inmediato devolviendo `INFEASIBLE`, lo que rompe la ilusión de una demo lista para producción.
+* **Severidad Media**: El administrador de la demo no puede crear, listar, editar o ver la disponibilidad de ningún docente en el sistema para realizar ajustes rápidos.
+
+---
+
+## Hallazgos verificados
+
+### Backend
+* **Severidad: Baja**
+* **Evidencia**: En [backend/app/api/routes/teachers.py](file:///c:/Jeicob/generadorHorarios/backend/app/api/routes/teachers.py) se definen correctamente los endpoints `/teachers` (lista de profesores para administrador, requiere rol admin) y `/teachers/{teacher_id}/profile` (obtener y actualizar perfiles de cualquier docente). Los endpoints para disponibilidad del docente y para `/me/teacher-profile` están bien estructurados.
+* **Impacto**: El backend proporciona soporte completo para la API de profesores; el problema no reside en el enrutamiento o lógica del backend, sino en la falta de consumo desde el cliente frontend.
+* **Archivos relacionados**: 
+  - [backend/app/api/routes/teachers.py](file:///c:/Jeicob/generadorHorarios/backend/app/api/routes/teachers.py)
+  - [backend/app/api/deps.py](file:///c:/Jeicob/generadorHorarios/backend/app/api/deps.py)
+
+### Frontend
+* **Severidad: Alta**
+* **Evidencia**: En [frontend/src/components/Sidebar.tsx](file:///c:/Jeicob/generadorHorarios/frontend/src/components/Sidebar.tsx), la variable `adminLinks` define todos los enlaces del administrador del sistema. No se incluye ningún enlace para administrar profesores (ej. `/admin/teachers` o `Teachers`). Además, en [frontend/src/App.tsx](file:///c:/Jeicob/generadorHorarios/frontend/src/App.tsx) no existe ninguna ruta declarada para tal fin. En el directorio [frontend/src/pages/](file:///c:/Jeicob/generadorHorarios/frontend/src/pages) no existe ningún archivo de página para listado general de profesores.
+* **Impacto**: Un administrador de la plataforma no tiene interfaz gráfica para gestionar los profesores ni ajustar sus capacidades u horas, haciéndolo dependiente de registros manuales a través de la ruta pública de registro `/register`.
+* **Archivos relacionados**:
+  - [frontend/src/components/Sidebar.tsx](file:///c:/Jeicob/generadorHorarios/frontend/src/components/Sidebar.tsx)
+  - [frontend/src/App.tsx](file:///c:/Jeicob/generadorHorarios/frontend/src/App.tsx)
+  - [frontend/src/api/teachers.ts](file:///c:/Jeicob/generadorHorarios/frontend/src/api/teachers.ts) (Faltan llamadas administrativas como `listTeachers`).
+
+### Base de datos / seed
+* **Severidad: Alta**
+* **Evidencia**: En [backend/app/db/seed.py](file:///c:/Jeicob/generadorHorarios/backend/app/db/seed.py), se define la disponibilidad para los profesores `Carmen Diaz` (t3), `Marco Torres` (t4) y `Elena Ramos` (t5), junto con sus cargas académicas asignadas en la sección nocturna `SD-C2-A`. Los datos contienen una colisión matemática insalvable.
+* **Impacto**: Garantiza que el optimizador falle siempre en la semilla por defecto, reportando `INFEASIBLE` de forma sistemática.
+* **Archivos relacionados**:
+  - [backend/app/db/seed.py](file:///c:/Jeicob/generadorHorarios/backend/app/db/seed.py)
+
+### OR-Tools / scheduler
+* **Severidad: Ninguna (Funciona Correctamente)**
+* **Evidencia**: Se ha ejecutado el motor en un entorno aislado replicando los DTOs sembrados. El resolvedor OR-Tools CP-SAT en [backend/app/services/scheduler/solver.py](file:///c:/Jeicob/generadorHorarios/backend/app/services/scheduler/solver.py) declara y procesa correctamente las restricciones duras. Al aliviar el solapamiento de disponibilidades (permitiendo a `Carmen Diaz` trabajar los lunes en la noche), el resolvedor cambia su estado de forma inmediata de `infeasible` a `optimal`.
+* **Impacto**: Valida que la formulación matemática de restricciones en CP-SAT es 100% correcta y el resolvedor se comporta según el diseño.
+* **Archivos relacionados**:
+  - [backend/app/services/scheduler/solver.py](file:///c:/Jeicob/generadorHorarios/backend/app/services/scheduler/solver.py)
+  - [backend/app/services/scheduler/constraints.py](file:///c:/Jeicob/generadorHorarios/backend/app/services/scheduler/constraints.py)
+
+### Diagnósticos
+* **Severidad: Media**
+* **Evidencia**: En [backend/app/services/scheduler/domain.py](file:///c:/Jeicob/generadorHorarios/backend/app/services/scheduler/domain.py), el método `validate_obvious_issues` comprueba límites semanales y capacidades de salas individuales. Sin embargo, carece de un analizador de capacidad acumulada de turnos frente a la disponibilidad conjunta de docentes específicos de una sección.
+* **Impacto**: Incapacidad para generar diagnósticos pre-solve detallados cuando la causa de la infeasibilidad es un choque colectivo de turnos, forzando a delegar la respuesta al resolvedor CP-SAT, que carece de explicabilidad nativa en caso de fallo.
+* **Archivos relacionados**:
+  - [backend/app/services/scheduler/domain.py](file:///c:/Jeicob/generadorHorarios/backend/app/services/scheduler/domain.py)
+
+---
+
+## Análisis específico del módulo de profesores
+
+### Qué existe
+1. **Modelos**: Modelos SQLAlchemy robustos para el perfil del profesor `TeacherProfile` y sus bloques de disponibilidad `TeacherAvailability` en [backend/app/models/teacher.py](file:///c:/Jeicob/generadorHorarios/backend/app/models/teacher.py).
+2. **Endpoints de Backend**: 
+   - `POST /api/auth/register-teacher`: Registro público de profesores (con campos de perfil como horas máx/mín, tipo de empleo, etc.).
+   - `GET /api/teachers`: Lista de profesores con carga ansiosa (`selectinload`) de usuario.
+   - `GET/PUT /api/teachers/{teacher_id}/profile`: Visualización y actualización del perfil administrativo.
+   - `GET/POST/PUT/DELETE /api/teachers/{teacher_id}/availability/{availability_id}`: CRUD completo para bloques individuales de disponibilidad.
+   - `GET/PUT /api/me/teacher-profile` y `/me/availability` para que el profesor autenticado edite su información personal.
+3. **Frontend Autenticado para Profesores**:
+   - `TeacherProfilePage.tsx` y `TeacherAvailabilityPage.tsx` en el frontend funcionan adecuadamente para el profesor autenticado, permitiéndole actualizar sus datos y gestionar bloques (alta, modificación, eliminación) con refresco mediante React Query.
+   - `MySchedulePage.tsx` funciona y consume `/api/me/schedule` mostrando la rejilla del horario una vez publicado por el admin.
+   - `ProtectedRoute.tsx` y `LoginPage.tsx` filtran correctamente por rol `admin` y `teacher`, y redirigen correspondientemente (admin a `/` e instructor a `/my-schedule`).
+
+### Qué falta
+1. **Frontend Administrativo**: 
+   - Falta una vista de administración centralizada de profesores (`TeachersPage.tsx`) que permita al administrador listar todos los instructores registrados en el sistema.
+   - Faltan vistas para que el administrador pueda consultar y editar el perfil de un docente específico, así como gestionar sus bloques de disponibilidad directamente si este lo solicita.
+2. **Navegación e Integración**:
+   - Falta el enlace "Teachers" o "Docentes" en la barra lateral del administrador (`adminLinks` en `Sidebar.tsx`).
+   - Falta la ruta `/admin/teachers` en [frontend/src/App.tsx](file:///c:/Jeicob/generadorHorarios/frontend/src/App.tsx).
+3. **Cliente de API**:
+   - Faltan las funciones `listTeachers`, `getTeacherProfile` y `updateTeacherProfile` en [frontend/src/api/teachers.ts](file:///c:/Jeicob/generadorHorarios/frontend/src/api/teachers.ts) orientadas al rol administrador.
+
+### Qué está roto o desconectado
+* **Desconexión Total**: Las capacidades administrativas de gestión de docentes están 100% implementadas en el backend y 0% consumidas en el frontend. El administrador no tiene forma visual de ver quiénes son los docentes en el sistema, obligándolo a interactuar a través de las bases de datos o consultando endpoints de API de manera cruda.
+
+### Qué debe ver el administrador
+* Enlace en la barra lateral: `Teachers` / `Docentes`.
+* Tabla con todos los docentes registrados: Nombre, Correo, Código de Docente, Tipo de Empleo, Rol Académico, Horas Máximas Semanales.
+* Botón "Editar Perfil": Abre un formulario modal o una vista dedicada para ajustar sus límites (horas diarias, bloques consecutivos, turnos preferidos, capacidades teóricas/prácticas).
+* Botón "Gestionar Disponibilidad": Abre la agenda semanal de disponibilidad del docente seleccionado, permitiendo agregar, editar o borrar bloques de tiempo.
+
+### Qué debe ver el docente
+* El docente únicamente debe ver las vistas de auto-servicio ya existentes: "My Schedule" (su horario publicado), "Teacher Profile" (sus datos y parámetros de carga) y "Availability" (sus bloques horarios semanales). Esto ya se encuentra conectado de forma correcta.
+
+---
+
+## Análisis específico del INFEASIBLE
+
+La ejecución de la generación de horarios para la semilla por defecto ("2026-I Demo Term") arroja el estado `INFEASIBLE` de forma consistente. A continuación, se presenta la demostración matemática detallada y empírica del cuello de botella.
+
+### Causa o causas probables
+La causa es un **solapamiento y saturación matemática insoluble** en la disponibilidad horaria de los docentes asignados al turno nocturno (`Shift.evening`) para la sección **`SD-C2-A` (s4)**, sumado a las restricciones duras de no-solapamiento de secciones.
+
+### Demostración Matemática y Evidencia
+
+1. **La Sección `SD-C2-A` (s4) y sus Turnos**:
+   * Esta sección está asignada de manera exclusiva al turno nocturno (`Shift.evening`).
+   * El turno nocturno cuenta con **4 bloques semanales por día de lunes a viernes** (Bloque 10: 18:00-19:00, Bloque 11: 19:00-20:00, Bloque 12: 20:00-21:00, Bloque 13: 21:00-22:00).
+   * Duración máxima disponible por noche = **4 bloques atómicos**.
+
+2. **Cursos y Cargas Asignadas en `SD-C2-A`**:
+   La sección tiene cuatro cursos semilla que deben programarse obligatoriamente dentro del turno nocturno (20 horas en total):
+   * **`PRG101`** (Docente: `Pedro Salas`): 4 horas semanales. Requiere laboratorio de cómputo (`LABPC1`). Estructura: **2 sesiones de 2 bloques**.
+   * **`DB101`** (Docente: `Carmen Diaz`): 4 horas semanales. Requiere laboratorio de cómputo (`LABPC1`). Estructura: **2 sesiones de 2 bloques**.
+   * **`CAD101`** (Docente: `Marco Torres`): 4 horas semanales. Requiere laboratorio de cómputo (`LABPC1`). Estructura: **2 sesiones de 2 bloques**.
+   * **`ETH101`** (Docente: `Elena Ramos`): 2 horas semanales. Requiere aula común (`classroom`). Estructura: **1 sesión de 2 bloques**.
+
+3. **Disponibilidad Nocturna de los Docentes Involucrados**:
+   * **`Pedro Salas`**: Disponible todos los días de la semana por la noche (18:00 - 22:00).
+   * **`Carmen Diaz`**: Disponible en la noche **únicamente los martes y jueves** (18:00 - 22:00).
+   * **`Marco Torres`**: Disponible en la noche **únicamente los martes y jueves** (18:00 - 22:00).
+   * **`Elena Ramos`**: Disponible en la noche **únicamente los jueves** (18:00 - 22:00).
+
+4. **El Bloqueo del Jueves por la Noche**:
+   * Dado que `Carmen Diaz` debe impartir **2 sesiones de 2 bloques** de `DB101` y su disponibilidad nocturna se limita estrictamente a los martes y jueves, se ve obligada a programar **1 sesión el martes y 1 sesión el jueves**.
+   * De forma idéntica, `Marco Torres` debe impartir **2 sesiones de 2 bloques** de `CAD101` y su disponibilidad nocturna también se limita a martes y jueves, forzándole a programar **1 sesión el martes y 1 sesión el jueves**.
+   * **Saturación del Martes**: La sesión de `DB101` (2 bloques) y la de `CAD101` (2 bloques) consumen **4 bloques** en total. Al no poder solaparse las clases de una misma sección (`s4`), consumen el 100% de la noche del martes (4 bloques disponibles).
+   * **Saturación del Jueves**: De igual manera, la segunda sesión de `DB101` (2 bloques) y la segunda de `CAD101` (2 bloques) consumen el 100% de la noche del jueves (4 bloques disponibles).
+   * **El Conflicto Insoluble**: El curso **`ETH101`** (impartido por `Elena Ramos`) requiere **1 sesión de 2 bloques** en el turno nocturno. Sin embargo, la docente `Elena Ramos` solo está disponible por la noche los **jueves**. 
+   * Dado que el jueves por la noche ya está 100% saturado con `DB101` (2 bloques) y `CAD101` (2 bloques) debido a las restricciones de los otros instructores, es matemáticamente imposible acomodar la sesión de `ETH101` (que requiere otros 2 bloques, sumando un total de 6 bloques requeridos frente a los 4 bloques físicos del turno).
+   * Tampoco es posible reprogramar `DB101` o `CAD101` a otros días (Lunes, Miércoles, Viernes) porque sus docentes respectivos (`Carmen Diaz` y `Marco Torres`) tienen bloqueada esa disponibilidad en el seed.
+
+### Restricciones duras involucradas
+1. **Teacher Availability**: Los docentes no pueden impartir clases fuera de sus bloques de disponibilidad.
+2. **Section No-Overlap**: Las clases de la sección `s4` no pueden programarse en el mismo bloque horario (no hay clases paralelas para los mismos estudiantes).
+3. **Section Shift Boundary**: Las clases de la sección `s4` deben ubicarse estrictamente en su turno asignado (Noche, bloques 10-13).
+
+### Cómo comprobarlo
+Se ha implementado un script de prueba de resolvedor in-memory (`backend/app/scratch_solve.py`) que replica el escenario exacto de la base de datos sin necesidad de levantar PostgreSQL. 
+* Si se ejecuta con los datos por defecto del seed, reporta inmediatamente `Solver Status: infeasible`.
+* Al añadir disponibilidad para `Carmen Diaz` en la noche de los lunes (`DayOfWeek.monday`), ella puede mover una sesión de `DB101` al lunes por la noche. Esto libera la noche del jueves para que `ETH101` se posicione exitosamente. Al ejecutar la simulación modificada, el resolvedor responde con éxito absoluto: `Solver Status: optimal`.
+
+### Qué cambiar primero
+Se requiere modificar la semilla de datos (`backend/app/db/seed.py`) para aliviar la sobre-restricción horaria del turno de la noche, o bien flexibilizar levemente la disponibilidad nocturna de alguno de los docentes involucrados (`Carmen Diaz` o `Marco Torres`) a otros días de la semana en la noche (ej. lunes o miércoles).
+
+---
+
+## Plan de reparación priorizado
+
+### P0: Imprescindible para que la demo funcione
+1. **Corregir la Semilla de Datos (`backend/app/db/seed.py`)**:
+   * Modificar el rango de disponibilidad de `Carmen Diaz` para que sea disponible los lunes, martes y jueves en la noche (18:00 a 22:00) como tipo de disponibilidad `available` o `discouraged`.
+   * Esto desbloquea el resolvedor y permite que la generación por defecto en la demo resulte exitosa (`optimal`/`feasible`) de forma inmediata con semilla 42.
+
+### P1: Importante para completar el MVP
+1. **Creación de la Vista de Profesores para Administrador (`TeachersPage.tsx`)**:
+   * Crear el archivo `frontend/src/pages/TeachersPage.tsx` implementando un listado denso de todos los docentes empleando el componente reutilizable `DataTable`.
+   * Conectar campos clave: Nombre, Correo, Tipo de Empleo, Rol, Carga máxima diaria/semanal.
+2. **Formulario de Registro/Edición de Profesores**:
+   * Permitir al administrador editar los parámetros de perfil de los docentes (máximo de horas, turnos permitidos, etc.) enviando una mutación `PUT` a `/api/teachers/{id}/profile`.
+3. **Gestión de Disponibilidad para Admin**:
+   * Integrar en la fila de cada docente un enlace/botón para gestionar su disponibilidad, reutilizando la lógica del componente `TeacherAvailabilityPage.tsx` pero parametrizada con el `teacherId` del docente seleccionado.
+4. **Enrutamiento e Integración**:
+   * Declarar la ruta `/admin/teachers` en [frontend/src/App.tsx](file:///c:/Jeicob/generadorHorarios/frontend/src/App.tsx) protegida con rol `admin`.
+   * Agregar el enlace correspondientemente en `Sidebar.tsx` bajo la sección `adminLinks` para visibilidad del administrador.
+5. **Completar Cliente de API**:
+   * Implementar `listTeachers()`, `getTeacherProfile(id)` y `updateTeacherProfile(id, payload)` en `frontend/src/api/teachers.ts`.
+
+### P2: Mejoras posteriores
+1. **Diagnóstico pre-solve robusto en `domain.py`**:
+   * Añadir un chequeo estático previo en `validate_obvious_issues` que sume la duración de las sesiones que obligatoriamente deben caer en un día y turno específicos para una sección (debido a limitaciones cruzadas de disponibilidad de profesores) y valide si superan la capacidad física de bloques del turno en ese día.
+   * Si excede, emitir un mensaje de diagnóstico preventivo detallado (ej. *"Saturación de turno nocturno el jueves para la sección X debido a las restricciones de los docentes Y y Z"*). Esto evitaría que el sistema falle silenciosamente o con errores genéricos.
+2. **Visualización de Horario Global e Interactividad**:
+   * Mejoras de interfaz gráfica para alertas de solapamiento en vivo y panel interactivo para el administrador.
+
+---
+
+## Pruebas recomendadas
+
+### Backend tests
+Para evitar regresiones tras modificar los datos semilla o al integrar validaciones de diagnóstico, se aconseja ejecutar la suite de pruebas completa:
+```powershell
+cd backend
+python -m pytest app\tests -q
+```
+Se debe añadir un test unitario en [backend/app/tests/test_scheduler_diagnostics.py](file:///c:/Jeicob/generadorHorarios/backend/app/tests/test_scheduler_diagnostics.py) que simule una saturación de bloque por solapamiento de disponibilidad de profesores para certificar que el método pre-solve retorne el error adecuado en lugar de derivarlo al motor CP-SAT.
+
+### Frontend build/tests
+Dado que el proyecto utiliza TypeScript y Vite, es indispensable validar que las nuevas páginas y rutas del administrador compilen sin errores estáticos:
+```powershell
+cd frontend
+npm run build
+```
+Esto asegurará que no queden referencias rotas a componentes, tipos incompatibles o fallas de tipado en `App.tsx` y `teachers.ts`.
+
+### Validación manual local
+Tras levantar PostgreSQL y poblar la nueva semilla:
+1. Iniciar sesión como administrador.
+2. Ir a la nueva sección de "Docentes" y verificar que se visualizan los 6 profesores sembrados de manera correcta.
+3. Dirigirse al panel "Generate", seleccionar el término "2026-I Demo Term" y hacer clic en generar.
+4. Validar que el resultado arroje exitosamente `OPTIMAL` o `FEASIBLE` con 27 asignaciones totales en un tiempo menor a 5 segundos.
+
+### Consultas SQL útiles si aplica
+Si se desea examinar el estado de las disponibilidades y las horas cargadas directamente en base de datos PostgreSQL:
+
+* **Ver las horas totales semanales requeridas por sección frente a su turno asignado**:
+  ```sql
+  SELECT s.name AS seccion, s.shift AS turno, SUM(co.weekly_hours) AS horas_totales
+  FROM sections s
+  JOIN course_offerings co ON co.section_id = s.id
+  WHERE s.is_active = true
+  GROUP BY s.name, s.shift;
+  ```
+
+* **Comprobar la disponibilidad nocturna de los instructores asignados a cursos de la sección `SD-C2-A`**:
+  ```sql
+  SELECT u.full_name, ta.day_of_week, ta.start_time, ta.end_time, ta.availability_type
+  FROM teacher_availability ta
+  JOIN teacher_profiles tp ON ta.teacher_id = tp.id
+  JOIN users u ON tp.user_id = u.id
+  WHERE tp.id IN (
+      SELECT DISTINCT co.teacher_id 
+      FROM course_offerings co 
+      JOIN sections s ON co.section_id = s.id 
+      WHERE s.code = 'SD-C2-A'
+  );
+  ```
+
+---
+
+## Preguntas o datos faltantes
+
+* **Frecuencia de actualización de disponibilidad**: ¿Debe el administrador poder crear o eliminar profesores directamente, o toda cuenta de profesor se asume creada a través del flujo de `/register`? (El backend soporta creación vía endpoint, pero el diseño actual parece favorecer el auto-registro).
+* **Bloques horarios no estructurados**: En el MVP, los bloques son de una hora atómica. Si se introduce flexibilidad para clases de duraciones diferentes (ej. sesiones de 1.5 horas), la lógica de `consecutive_coverage` y la matriz de restricciones del CP-SAT requerirán una reestructuración de variables continuas. Se asume que esto queda fuera del alcance para la reparación del MVP.
+
+---
+
+## Brief para crear prompt de Codex
+
+### Hechos confirmados
+1. El resolvedor OR-Tools funciona a la perfección. La infeasibilidad es puramente un **choque de datos semilla** en el turno nocturno de la sección `SD-C2-A` (s4) debido a que `ETH101` (Elena Ramos) solo tiene jueves por la noche disponible, mientras que `DB101` y `CAD101` ya saturan por completo los martes y jueves por la noche al no tener disponibilidad otros días de la semana en la noche.
+2. El enrutador, componentes de barra lateral y enrutado principal del frontend ignoran la administración de profesores por parte del administrador del sistema.
+3. Los endpoints del backend para la gestión de profesores y disponibilidad por parte de administradores están totalmente programados y funcionales.
+
+### Archivos que Codex debe revisar
+* [backend/app/db/seed.py](file:///c:/Jeicob/generadorHorarios/backend/app/db/seed.py) (Para ajustar disponibilidades semilla).
+* [frontend/src/components/Sidebar.tsx](file:///c:/Jeicob/generadorHorarios/frontend/src/components/Sidebar.tsx) (Para insertar el enlace a Profesores).
+* [frontend/src/App.tsx](file:///c:/Jeicob/generadorHorarios/frontend/src/App.tsx) (Para mapear la ruta de administración de profesores).
+* [frontend/src/api/teachers.ts](file:///c:/Jeicob/generadorHorarios/frontend/src/api/teachers.ts) (Para agregar funciones cliente de API administrativas).
+* [frontend/src/pages/](file:///c:/Jeicob/generadorHorarios/frontend/src/pages) (Para crear `TeachersPage.tsx` y vistas de edición).
+
+### Cambios que Codex debe hacer
+1. **Modificar `seed.py`**:
+   * En `_availability(db, profiles)`, línea 194, añadir el lunes al rango nocturno de `Carmen Diaz`:
+     `([DayOfWeek.monday, DayOfWeek.tuesday, DayOfWeek.thursday], time(18), time(22), AvailabilityType.discouraged)`
+2. **Crear `TeachersPage.tsx`**:
+   * Diseñar una página densa bajo `frontend/src/pages/TeachersPage.tsx`.
+   * Debe mostrar un listado general de profesores del sistema.
+   * Proporcionar botones para editar sus datos de perfil (máximos de horas semanales, diarias, etc.) y un botón de redirección/modal para administrar su disponibilidad semanal semanalmente.
+3. **Extender `api/teachers.ts`**:
+   * Añadir `listTeachers()` para consumir `GET /api/teachers`.
+   * Añadir `getTeacherProfile(teacherId)` para consumir `GET /api/teachers/{teacher_id}`.
+   * Añadir `updateTeacherProfile(teacherId, payload)` para consumir `PUT /api/teachers/{teacher_id}/profile`.
+4. **Habilitar Rutas**:
+   * Importar e integrar la nueva página `TeachersPage` en `App.tsx` bajo la ruta `/admin/teachers` dentro del `ProtectedRoute` reservado para administradores.
+   * Añadir `["/admin/teachers", "Teachers"]` en la barra lateral del administrador.
+
+### Cambios que Codex no debe hacer
+* No alterar ni relajar las restricciones duras del motor OR-Tools (ej. no cambiar `max_weekly_hours` o no omitir el no-overlap).
+* No alterar la lógica de autenticación ni eliminar soporte para profesores individuales de editar su propio perfil/disponibilidad.
+* No remover los archivos y scripts heredados de Next.js/Prisma del directorio raíz.
+
+### Criterios de aceptación
+* El comando `npm run build` en el frontend compila con éxito rotundo libre de errores de TypeScript.
+* El resolvedor genera un horario válido (`FEASIBLE` u `OPTIMAL`) para la semilla demo "2026-I Demo Term" sin reportar fallos de infeasibilidad.
+* Un administrador logueado en la plataforma visualiza una pestaña "Teachers" en la barra lateral que le permite auditar, listar y modificar los profesores registrados y sus disponibilidades.

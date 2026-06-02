@@ -23,6 +23,7 @@ import ScheduleByTeacherPage from "./pages/ScheduleByTeacherPage";
 import ScheduleRunDetailPage from "./pages/ScheduleRunDetailPage";
 import SectionsPage from "./pages/SectionsPage";
 import TeacherAvailabilityPage from "./pages/TeacherAvailabilityPage";
+import TeachersPage from "./pages/TeachersPage";
 import TeacherProfilePage from "./pages/TeacherProfilePage";
 import TimeSlotsPage from "./pages/TimeSlotsPage";
 
@@ -39,6 +40,7 @@ export default function App() {
       <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
         <Route element={<Layout />}>
           <Route index element={<DashboardPage />} />
+          <Route path="/admin/teachers" element={<TeachersPage />} />
           <Route path="/admin/academic-terms" element={<AcademicTermsPage />} />
           <Route path="/admin/programs" element={<ProgramsPage />} />
           <Route path="/admin/cycles" element={<CyclesPage />} />
