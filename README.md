@@ -10,7 +10,7 @@ MVP serio para generar horarios academicos de un instituto tecnico. Usa FastAPI,
 - Generacion de horarios con OR-Tools CP-SAT, restricciones duras y penalizaciones suaves configurables.
 - Diagnosticos legibles cuando el modelo es INFEASIBLE.
 - Vistas de horario por seccion, docente y aula.
-- Publicacion de ejecuciones de horario y pagina `Mi horario` para docentes.
+- Publicacion y borrado de ejecuciones de horario, con pagina `Mi horario` para docentes.
 - Exportacion Excel/PDF, recomendaciones y auditoria.
 
 ## Arquitectura
@@ -126,6 +126,7 @@ respect_manual_locks = false
 8. El resultado esperado para el seed demo corregido es `FEASIBLE` u `OPTIMAL`.
 9. Abre la ejecucion para revisar asignaciones por seccion, docente y aula.
 10. Publica una ejecucion factible/optima para que los docentes puedan verla en `Mi horario`.
+11. Si quieres limpiar una corrida demo, abre la ejecucion y usa `Borrar horario`; se eliminan sus asignaciones, conflictos y publicacion asociada.
 
 ## Modulo Docentes
 
@@ -158,7 +159,7 @@ Todas las rutas viven bajo `/api`.
 - Auth: `/auth/register-teacher`, `/auth/login`, `/auth/me`, `/auth/create-admin`.
 - Docentes: `/teachers`, `/teachers/{id}`, `/teachers/{id}/profile`, `/teachers/{id}/availability`, `/me/teacher-profile`, `/me/availability`.
 - Datos academicos: `/academic-terms`, `/programs`, `/cycles`, `/sections`, `/courses`, `/rooms`, `/time-slots`, `/course-offerings`.
-- Horarios: `/schedule-runs/generate`, `/schedule-runs/{id}`, `/schedule-runs/{id}/assignments/by-section`, `/by-teacher`, `/by-room`, `/conflicts`, `/publish`.
+- Horarios: `/schedule-runs/generate`, `/schedule-runs/{id}`, `/schedule-runs/{id}/assignments/by-section`, `/by-teacher`, `/by-room`, `/conflicts`, `/publish`, `DELETE /schedule-runs/{id}`.
 - Recomendaciones: `/recommendations/course-offering/{course_offering_id}`.
 - Exportaciones: `/exports/schedule-runs/{id}/excel`, `/exports/schedule-runs/{id}/pdf`.
 
@@ -187,6 +188,16 @@ cd backend
 alembic upgrade head
 python -m app.db.seed
 ```
+
+## Despliegue
+
+El repo esta preparado para:
+
+- Frontend Vite en Vercel usando `frontend/` como root directory y `frontend/vercel.json`.
+- Backend FastAPI en Render usando `render.yaml`.
+- PostgreSQL en Neon con `DATABASE_URL`; el backend acepta URLs Neon `postgresql://...` y las normaliza para `psycopg`.
+
+Consulta `DEPLOYMENT.md` para los pasos completos y variables de entorno.
 
 ## Limitaciones MVP
 

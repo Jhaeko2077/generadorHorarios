@@ -1,13 +1,19 @@
 ﻿from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import current_teacher_profile, require_admin, require_teacher_or_admin
 from app.core.enums import ScheduleRunStatus
 from app.db.session import get_db
-from app.models.schedule import PublishedSchedule, ScheduleAssignment, ScheduleConflict, ScheduleRun
+from app.models.schedule import (
+    PublishedSchedule,
+    ScheduleAssignment,
+    ScheduleAssignmentSlot,
+    ScheduleConflict,
+    ScheduleRun,
+)
 from app.models.teacher import TeacherProfile
 from app.models.user import User
 from app.schemas.common import (
@@ -146,6 +152,18 @@ def delete_run(run_id: str, db: Session = Depends(get_db), user: User = Depends(
     run = db.get(ScheduleRun, run_id)
     if not run:
         raise HTTPException(404, "Schedule run not found")
+    assignment_ids = db.scalars(
+        select(ScheduleAssignment.id).where(ScheduleAssignment.schedule_run_id == run_id)
+    ).all()
+    if assignment_ids:
+        db.execute(
+            delete(ScheduleAssignmentSlot).where(
+                ScheduleAssignmentSlot.schedule_assignment_id.in_(assignment_ids)
+            )
+        )
+    db.execute(delete(PublishedSchedule).where(PublishedSchedule.schedule_run_id == run_id))
+    db.execute(delete(ScheduleConflict).where(ScheduleConflict.schedule_run_id == run_id))
+    db.execute(delete(ScheduleAssignment).where(ScheduleAssignment.schedule_run_id == run_id))
     db.delete(run)
     write_audit(db, user_id=user.id, action="delete", entity_type="schedule_run", entity_id=run_id)
     db.commit()

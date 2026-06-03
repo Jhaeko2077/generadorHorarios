@@ -29,6 +29,10 @@ export function publishRun(id: string) {
   return api(`/schedule-runs/${id}/publish`, { method: "POST" });
 }
 
+export function deleteRun(id: string) {
+  return api<{ ok: boolean }>(`/schedule-runs/${id}`, { method: "DELETE" });
+}
+
 export function recommendations(courseOfferingId: string, payload: unknown) {
   return api<Recommendation[]>(`/recommendations/course-offering/${courseOfferingId}`, {
     method: "POST",
